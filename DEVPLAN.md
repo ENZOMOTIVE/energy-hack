@@ -193,11 +193,14 @@ if gap_mw < 0:  pass                              # surplus: given away, no reve
 
 Actions (at most one per step):
 - `noop()`
-- `trade(park_id, delta_mw, hours)`: for every future step t in the next
-  `hours` hours: `schedule[park][t] = clip(schedule + delta_mw, 0, p_mw)`.
-  Settlement at execution time, per affected step:
-  delta < 0 (buy back): `cost += |delta| * 0.25 * BUYBACK_MULT * da_price[t]`
-  delta > 0 (sell more): `cost -= delta * 0.25 * SELLMORE_MULT * da_price[t]`
+- `trade(park_id, delta_mw, hours, start_step=None)`: applies to `hours` worth of
+  steps beginning at `max(k+1, start_step)`; start_step defaults to "next step"
+  and exists so known future events (the eclipse) can be pre-traded at step 0.
+  `schedule[park][t] = clip(schedule + delta_mw, 0, p_mw)`.
+  Settlement at execution time, per affected step, charged on the APPLIED
+  (post-clip) delta, not the requested one:
+  applied < 0 (buy back): `cost += |applied| * 0.25 * BUYBACK_MULT * da_price[t]`
+  applied > 0 (sell more): `cost -= applied * 0.25 * SELLMORE_MULT * da_price[t]`
 - `dispatch_crew(park_id)`: `cost += CREW_FEE_EUR`. If the park has an active
   fault, it clears at step k + REPAIR_STEPS. If not, `false_dispatch += 1` and
   nothing else happens. A second dispatch to the same park is a no-op plus fee.
@@ -223,6 +226,7 @@ Trace JSON written per episode (this schema is the frontend contract, do not dri
   ],
   "actions": [
     {"k": 31, "type": "trade", "park": "munich", "delta_mw": -8.0, "hours": 4,
+     "start_step": 32, "false_dispatch": false,
      "reason": "Actual is tracking weather-expected; this is a forecast bust, ..."}
   ],
   "totals": {"cost_eur": ..., "floor_eur": ..., "oracle_eur": ..., "score": ...,

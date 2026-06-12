@@ -1,0 +1,8 @@
+pvlib>=0.11
+numpy
+pandas
+fastapi
+uvicorn
+anthropic
+pytest
+httpx
