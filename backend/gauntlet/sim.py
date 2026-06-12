@@ -2,6 +2,9 @@
 
 Per-step order: compute actual production, let the agent act (trades affect
 future steps only), then settle the current step's imbalance.
+
+Faults are tracked per park (at most one each): the scenario's scripted fault
+plus any chaos-injected ones from the live /simulate endpoint.
 """
 
 import numpy as np
@@ -12,15 +15,30 @@ from .config import (BUYBACK_MULT, CREW_FEE_EUR, IMBALANCE_MULT, N_STEPS, PARKS,
 from .scenarios import Scenario
 from .weather import timestamps
 
+NEVER = N_STEPS + REPAIR_STEPS  # sentinel: fault not repaired within the day
 
-def run_episode(scenario: Scenario, agent: Agent, floor_cum: np.ndarray | None = None) -> dict:
+
+def collect_faults(scenario: Scenario, injected_faults: list | None = None) -> dict:
+    """Park -> fault dict. Scenario fault wins over an injected one on the same park."""
+    faults = {}
+    if scenario.fault:
+        f = scenario.fault
+        faults[f["park"]] = {"onset_step": f["onset_step"], "magnitude": f["magnitude"]}
+    for f in injected_faults or []:
+        if f["park"] not in faults:
+            faults[f["park"]] = {"onset_step": f["onset_step"], "magnitude": f["magnitude"]}
+    return faults
+
+
+def run_episode(scenario: Scenario, agent: Agent, floor_cum: np.ndarray | None = None,
+                injected_faults: list | None = None) -> dict:
     times = timestamps()
     park_ids = list(scenario.forecast.keys())
     schedule = {p: scenario.forecast[p].copy() for p in park_ids}
     actual = {p: np.zeros(N_STEPS) for p in park_ids}
     crew_dispatched = {p: False for p in park_ids}
-    repaired_at = N_STEPS + REPAIR_STEPS  # fault never repaired unless crew sent
-    fault = scenario.fault
+    faults = collect_faults(scenario, injected_faults)
+    repaired_at = {p: NEVER for p in faults}
 
     cost = 0.0
     cum_cost = np.zeros(N_STEPS)
@@ -31,8 +49,8 @@ def run_episode(scenario: Scenario, agent: Agent, floor_cum: np.ndarray | None =
     for k in range(N_STEPS):
         for p in park_ids:
             a = scenario.twin[p][k]
-            if fault and fault["park"] == p and fault["onset_step"] <= k < repaired_at:
-                a *= 1.0 - fault["magnitude"]
+            if p in faults and faults[p]["onset_step"] <= k < repaired_at[p]:
+                a *= 1.0 - faults[p]["magnitude"]
             actual[p][k] = a
 
         obs = Obs(
@@ -70,10 +88,9 @@ def run_episode(scenario: Scenario, agent: Agent, floor_cum: np.ndarray | None =
             is_false = False
             if not crew_dispatched[p]:
                 crew_dispatched[p] = True
-                fault_active = (fault and fault["park"] == p
-                                and fault["onset_step"] <= k < repaired_at)
+                fault_active = p in faults and faults[p]["onset_step"] <= k < repaired_at[p]
                 if fault_active:
-                    repaired_at = k + REPAIR_STEPS
+                    repaired_at[p] = k + REPAIR_STEPS
                 else:
                     false_dispatches += 1
                     is_false = True

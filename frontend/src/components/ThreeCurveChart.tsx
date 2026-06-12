@@ -19,10 +19,14 @@ export default function ThreeCurveChart({
   steps,
   playhead,
   showEclipse = false,
+  height = 320,
+  compact = false,
 }: {
   steps: StepRecord[]
   playhead: number
   showEclipse?: boolean
+  height?: number
+  compact?: boolean
 }) {
   const sum = (rec: Record<string, number>) =>
     Object.values(rec).reduce((a, b) => a + b, 0)
@@ -37,7 +41,7 @@ export default function ThreeCurveChart({
   }))
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
+    <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid stroke="#21262d" />
         <XAxis dataKey="time" interval={11} stroke="#8b949e" fontSize={12} />
@@ -58,7 +62,7 @@ export default function ThreeCurveChart({
           contentStyle={{ background: '#161b22', border: '1px solid #30363d' }}
           labelStyle={{ color: '#e6edf3' }}
         />
-        <Legend />
+        {!compact && <Legend />}
         {showEclipse && (
           <ReferenceArea
             x1="19:15"
