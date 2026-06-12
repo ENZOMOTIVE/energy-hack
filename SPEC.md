@@ -62,6 +62,8 @@ S3 is the finale and the pitch centerpiece: it mixes a perfectly forecastable co
 
 Stretch scenario (build only if ahead of schedule): soiling_creep, a slow multi-day output decline, tests patience vs overreaction.
 
+Implementation directive: write scenario parameters (front arrival time, fault onset and magnitude, cloud field) as seeded random draws from the start, even though core episodes run a single fixed seed. The Monte Carlo layer below reuses that machinery for free.
+
 ## Agent contract
 
 ```python
@@ -93,7 +95,20 @@ For each (scenario, agent): run the episode, total all costs.
 - Score = (floor_cost - agent_cost) / (floor_cost - oracle_cost), reported as "% of recoverable losses recovered," clamped to [0, 1].
 - Safety metrics (shown as flags, not folded into score): false crew dispatches, trades against the gap direction, steps from event onset to first correct action.
 
-The oracle/floor bracket makes scores immune to "the scenario was just hard" objections and gives the leaderboard a single honest currency.
+The oracle/floor bracket makes scores immune to "the scenario was just hard" objections and gives the leaderboard a single honest currency. With the Monte Carlo layer enabled, that currency becomes a distribution instead of a point.
+
+## Monte Carlo layer (stretch: build only when DoD items 1-4 are green)
+
+Purpose: answer the judge question "isn't this leaderboard three hand-picked anecdotes?" by scoring agents across the space of bad days, not one realization of each.
+
+- **Robustness scoring**: run N=500 seeded variations per scenario (S1: front arrival jittered 1-5 h early, thickness varied; S2: fault onset 09:00-15:00, magnitude 10-40%; S3: cloud field over Valencia randomized) for the cheap agents: DoNothing, RuleAgent, oracle. Report mean recovery % and worst-decile (P10) per cell. Episodes are pvlib arithmetic, so 500 runs cost seconds.
+- **LLM sampling honesty**: the LLM worker gets 10-20 sampled episodes (API cost bound), reported as mean with a confidence interval. State this openly in the pitch; error bars are an evals company doing its job.
+- **MCTrader, a fourth contestant (further stretch)**: no LLM. At each step it samples 500 production futures from forecast uncertainty and picks the trade minimizing expected cost. It has no concept of a repair crew, so it should beat the rules on S1/S3 trading and fail S2 outright. That contrast (rules vs stochastic optimizer vs LLM) makes the gym's discriminating power the story.
+- **Fan chart (further stretch)**: the same samples give a P10/P50/P90 production band on the S3 replay screen. Fan charts are the native idiom of energy forecasting; domain judges read them as fluency.
+- **What stays deterministic**: the rehearsed demo replay remains a single fixed-seed episode, and prices stay real SMARD data (no synthetic price process to defend).
+- **Verifiable check**: `python -m backend.run --scenario S1 --agent rules --mc 500` writes a distribution JSON with 500 scores plus summary stats in under a minute, and `GET /results` carries mean/P10 fields when present.
+
+Demo line this buys: "Our scores are distributions, not anecdotes. We ran every agent through 500 versions of each bad day."
 
 ## API (FastAPI, serves UI only)
 
@@ -103,7 +118,7 @@ The oracle/floor bracket makes scores immune to "the scenario was just hard" obj
 
 ## UI (React via Vite, talks to FastAPI)
 
-1. **Leaderboard**: grid of scenarios x agents, recovery %, EUR lost, safety flags. The reveal screen.
+1. **Leaderboard**: grid of scenarios x agents, recovery %, EUR lost, safety flags. The reveal screen. Cells switch to mean + P10 (and a CI badge for the LLM) once Monte Carlo results exist.
 2. **Episode replay**: time scrubber with play button; three-curve chart (expected-from-forecast, expected-from-actual-weather, actual); price strip; action cards appearing at their timestep with the agent's reason; running euro counter with the do-nothing ghost line.
 3. (stretch, cut first) **Judge-plays-it**: same replay screen with the three action buttons enabled, judge's score lands on the leaderboard.
 
@@ -121,7 +136,7 @@ Hour 0.0-0.5, together: lock the trace JSON schema and Obs/Action types (this do
 - 4.5-5.5: scoring: oracle scripts, floor, recovery %
 - 5.5-7.0: RuleAgent + LLMWorker, run all 9 episodes, write traces
 - 7.0-8.5: FastAPI endpoints, integration, tune S1/S2 thresholds until the demo story reproduces deterministically
-- 8.5-10: numbers for slides, dry runs
+- 8.5-10: if DoD 1-4 are green, climb the stretch ladder (Monte Carlo robustness scoring first, then MCTrader); otherwise pitch support, numbers for slides, dry runs
 
 **Builder B (React + pitch)**
 - 0.5-2.0: Vite scaffold, mock trace data from the agreed schema
@@ -131,6 +146,8 @@ Hour 0.0-0.5, together: lock the trace JSON schema and Obs/Action types (this do
 - 8.0-10: pitch deck + two full rehearsals
 
 **Cut lines, in order**: judge-plays-it; live SSE run; map view; S1 (keep S2 + S3 if a scenario must go); safety flags in UI (keep in pitch verbally).
+
+**Stretch ladder, in order (build only if ahead, never blocks DoD)**: Monte Carlo robustness scoring; MCTrader agent; S3 fan chart; soiling_creep scenario.
 
 ## Definition of done (verifiable, per check)
 
