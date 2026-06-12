@@ -62,7 +62,7 @@ export default function Replay({
           {trace.totals.brain ? ` | brain: ${trace.totals.brain}` : ''}
         </span>
       </div>
-      <ThreeCurveChart steps={trace.steps} playhead={playhead} />
+      <ThreeCurveChart steps={trace.steps} playhead={playhead} showEclipse={scenario === 'S3'} />
       <div className="transport">
         <button onClick={() => setPlaying(!playing)}>{playing ? 'pause' : 'play'}</button>
         <span className="clock">{step.time.slice(11, 16)}</span>
