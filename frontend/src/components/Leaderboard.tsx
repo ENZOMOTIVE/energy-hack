@@ -46,6 +46,12 @@ export default function Leaderboard({ onOpen }: { onOpen: (sc: string, ag: strin
             {r.false_dispatches} wasted truck roll{r.false_dispatches > 1 ? 's' : ''}
           </div>
         )}
+        {r.mc && (
+          <div className="cost">
+            {r.mc.n} bad days: mean {Math.round(r.mc.mean * 100)}% | P10{' '}
+            {Math.round(r.mc.p10 * 100)}%
+          </div>
+        )}
       </td>
     )
   }
