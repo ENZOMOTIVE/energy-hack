@@ -15,6 +15,16 @@ make demo     # generate traces, build UI, serve everything at http://localhost:
 
 Dev mode: `make api` (backend on :8000) plus `make ui` (Vite on :5173).
 
+## Real data
+
+The SYNTHETIC/REAL toggle in the UI switches between the deterministic synthetic
+world and real days: Open-Meteo day-ahead forecasts vs archived actuals per park
+plus SMARD DE-LU day-ahead prices (single-zone assumption). S1's weather bust is
+a real forecast error that really happened. `data/real/` ships in the repo;
+refresh or re-pick days with `make fetch-data` (network, once), then
+`make traces-real`. Negative real prices are floored to 1 EUR/MWh in settlement
+(displayed unfloored); see TODO.md.
+
 ## Real LLM brain
 
 By default the LLM worker runs a deterministic mock (offline, reproducible).

@@ -1,0 +1,6 @@
+{
+  "sunny_day": "2026-05-26",
+  "cloudy_day": "2026-05-20",
+  "source": "Open-Meteo previous-runs (day-ahead fc) + archive (actual); SMARD 4169 DE-LU day-ahead",
+  "price_zone_assumption": "whole portfolio settles at DE-LU prices"
+}

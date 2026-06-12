@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchResults } from '../api'
+import { fetchResults, type DataSource } from '../api'
 import type { ResultRow } from '../types'
 
 const SCENARIO_LABELS: Record<string, string> = {
@@ -21,18 +21,28 @@ function scoreClass(s: number): string {
   return 'bad'
 }
 
-export default function Leaderboard({ onOpen }: { onOpen: (sc: string, ag: string) => void }) {
+export default function Leaderboard({
+  onOpen,
+  data,
+}: {
+  onOpen: (sc: string, ag: string) => void
+  data: DataSource
+}) {
   const [rows, setRows] = useState<ResultRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchResults()
+    setRows(null)
+    setError(null)
+    fetchResults(data)
       .then((r) => setRows(r.results))
       .catch((e) => setError(String(e)))
-  }, [])
+  }, [data])
 
   if (error) return <div className="loading">Backend unreachable: {error}. Run `make demo`.</div>
   if (!rows) return <div className="loading">Loading leaderboard...</div>
+
+  const days = [...new Set(rows.map((r) => r.day).filter(Boolean))]
 
   const cell = (sc: string, ag: string) => {
     const r = rows.find((x) => x.scenario === sc && x.agent === ag)
@@ -61,6 +71,13 @@ export default function Leaderboard({ onOpen }: { onOpen: (sc: string, ag: strin
       <p style={{ color: '#8b949e' }}>
         Recoverable losses recovered, per agent per bad day. Every score is bracketed between a
         perfect-foresight oracle (100%) and doing nothing (0%). Click a cell to replay the episode.
+        {data === 'real' && days.length > 0 && (
+          <>
+            {' '}
+            Real days: {days.join(' and ')} (Open-Meteo day-ahead forecasts vs archive, SMARD DE-LU
+            prices; S1 is a forecast bust that really happened).
+          </>
+        )}
       </p>
       <table className="board">
         <thead>

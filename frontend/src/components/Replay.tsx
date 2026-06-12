@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchEpisode } from '../api'
+import { fetchEpisode, type DataSource } from '../api'
 import type { Trace } from '../types'
 import ActionCards from './ActionCards'
 import EuroCounter from './EuroCounter'
@@ -8,10 +8,12 @@ import ThreeCurveChart from './ThreeCurveChart'
 export default function Replay({
   scenario,
   agent,
+  data,
   onBack,
 }: {
   scenario: string
   agent: string
+  data: DataSource
   onBack: () => void
 }) {
   const [trace, setTrace] = useState<Trace | null>(null)
@@ -24,10 +26,10 @@ export default function Replay({
     setTrace(null)
     setPlayhead(0)
     setPlaying(false)
-    fetchEpisode(scenario, agent)
+    fetchEpisode(scenario, agent, data)
       .then(setTrace)
       .catch((e) => setError(String(e)))
-  }, [scenario, agent])
+  }, [scenario, agent, data])
 
   useEffect(() => {
     if (playing) {

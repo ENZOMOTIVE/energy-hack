@@ -29,8 +29,9 @@ def make_agent(name: str):
     raise ValueError(f"unknown agent {name}")
 
 
-def run_one(scenario_name: str, agent_name: str, seed: int = DEFAULT_SEED, out: Path = DEFAULT_OUT) -> dict:
-    scenario = build(scenario_name, seed)
+def run_one(scenario_name: str, agent_name: str, seed: int = DEFAULT_SEED, out: Path = DEFAULT_OUT,
+            data: str = "synthetic") -> dict:
+    scenario = build(scenario_name, seed, data=data)
     floor_trace = run_episode(scenario, DoNothingAgent())
     floor_cum = floor_trace["_cum_cost"]
     if agent_name == "noop":
@@ -43,26 +44,29 @@ def run_one(scenario_name: str, agent_name: str, seed: int = DEFAULT_SEED, out: 
     trace["totals"]["floor_eur"] = round(floor, 2)
     trace["totals"]["oracle_eur"] = round(oracle, 2)
     trace["totals"]["score"] = round(score(trace["totals"]["cost_eur"], floor, oracle), 4)
+    trace["data"] = data
+    trace["day"] = scenario.day
     trace.pop("_cum_cost", None)
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{scenario_name}_{agent_name}.json").write_text(json.dumps(trace))
     return trace
 
 
-def run_all(seed: int = DEFAULT_SEED, out: Path = DEFAULT_OUT) -> dict:
+def run_all(seed: int = DEFAULT_SEED, out: Path = DEFAULT_OUT, data: str = "synthetic") -> dict:
     results = []
     for sc in SCENARIOS:
         for ag in ["noop", "rules", "llm"]:
-            trace = run_one(sc, ag, seed, out)
+            trace = run_one(sc, ag, seed, out, data=data)
             t = trace["totals"]
             results.append({
                 "scenario": sc, "agent": ag, "score": t["score"],
                 "cost_eur": t["cost_eur"], "floor_eur": t["floor_eur"],
                 "oracle_eur": t["oracle_eur"], "false_dispatches": t["false_dispatches"],
                 "steps_to_first_action": t["steps_to_first_action"],
+                **({"day": trace["day"]} if trace.get("day") else {}),
                 **({"brain": t["brain"]} if "brain" in t else {}),
             })
-    payload = {"seed": seed, "results": results}
+    payload = {"seed": seed, "data": data, "results": results}
     (out / "results.json").write_text(json.dumps(payload))
     return payload
 
@@ -113,9 +117,14 @@ def main():
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--data", choices=["synthetic", "real"], default="synthetic")
     ap.add_argument("--mc", type=int, metavar="N",
                     help="robustness scoring over N seeded variations (all agents)")
     args = ap.parse_args()
+    if args.data == "real" and args.out == DEFAULT_OUT:
+        args.out = DEFAULT_OUT / "real"
+    if args.mc and args.data == "real":
+        ap.error("MC runs on synthetic data only: a single real day has no seeded variations")
     if args.mc:
         scenarios = [args.scenario] if args.scenario else SCENARIOS
         for sc in scenarios:
@@ -124,7 +133,7 @@ def main():
                 print(f"{sc}/{ag}: mc mean={s['mean']:.2f} p10={s['p10']:.2f} n={s['n']}")
         return
     if args.all:
-        payload = run_all(args.seed, args.out)
+        payload = run_all(args.seed, args.out, data=args.data)
         for r in payload["results"]:
             print(f"{r['scenario']}/{r['agent']}: score={r['score']:.2f} "
                   f"cost={r['cost_eur']:.0f} floor={r['floor_eur']:.0f} "
@@ -132,7 +141,7 @@ def main():
     else:
         if not args.scenario:
             ap.error("--scenario required unless --all")
-        trace = run_one(args.scenario, args.agent, args.seed, args.out)
+        trace = run_one(args.scenario, args.agent, args.seed, args.out, data=args.data)
         print(json.dumps(trace["totals"], indent=2))
 
 

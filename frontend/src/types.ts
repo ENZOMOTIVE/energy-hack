@@ -53,6 +53,7 @@ export interface ResultRow {
   false_dispatches: number
   steps_to_first_action: number
   brain?: string
+  day?: string
   mc?: { mean: number; p10: number; n: number }
 }
 

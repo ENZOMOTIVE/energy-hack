@@ -2,7 +2,7 @@ PY := .venv/bin/python
 PIP := .venv/bin/pip
 PYTEST := .venv/bin/pytest
 
-.PHONY: setup traces test api ui demo
+.PHONY: setup traces traces-real fetch-data test api ui demo
 
 setup:
 	python3 -m venv .venv
@@ -11,6 +11,12 @@ setup:
 
 traces:
 	cd backend && ../$(PY) -m gauntlet.run --all
+
+fetch-data:
+	cd backend && ../$(PY) -m gauntlet.fetch_data --auto
+
+traces-real:
+	cd backend && ../$(PY) -m gauntlet.run --all --data real
 
 test:
 	$(PYTEST) backend/tests -q

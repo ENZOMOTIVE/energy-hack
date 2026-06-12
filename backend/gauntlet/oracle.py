@@ -15,6 +15,7 @@ from .sim import collect_faults
 
 def oracle_cost(scenario: Scenario, injected_faults: list | None = None) -> float:
     cost = 0.0
+    settle = scenario.settle_price if scenario.settle_price is not None else scenario.da_price
     faults = collect_faults(scenario, injected_faults)
     for p, forecast in scenario.forecast.items():
         actual = scenario.twin[p].copy()
@@ -25,7 +26,7 @@ def oracle_cost(scenario: Scenario, injected_faults: list | None = None) -> floa
         gap = forecast - actual
         short = np.clip(gap, 0.0, None)
         surplus = np.clip(-gap, 0.0, None)
-        cost += float(np.sum(short * STEP_HOURS * BUYBACK_MULT * scenario.da_price))
-        cost -= float(np.sum(surplus * STEP_HOURS * SELLMORE_MULT * scenario.da_price))
+        cost += float(np.sum(short * STEP_HOURS * BUYBACK_MULT * settle))
+        cost -= float(np.sum(surplus * STEP_HOURS * SELLMORE_MULT * settle))
     cost += CREW_FEE_EUR * len(faults)
     return cost

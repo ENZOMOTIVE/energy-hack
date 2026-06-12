@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import realdata
 from .agents.scripted import ScriptedAgent
 from .config import DEFAULT_SEED, N_STEPS, PARKS, SCENARIOS
 from .oracle import oracle_cost
@@ -29,23 +30,25 @@ app.add_middleware(
 )
 
 
-def _traces_dir() -> Path:
-    return Path(os.environ.get("GAUNTLET_TRACES_DIR", REPO_ROOT / "traces"))
+def _traces_dir(data: str = "synthetic") -> Path:
+    base = Path(os.environ.get("GAUNTLET_TRACES_DIR", REPO_ROOT / "traces"))
+    return base / "real" if data == "real" else base
 
 
 @app.get("/results")
-def results():
-    f = _traces_dir() / "results.json"
+def results(data: str = "synthetic"):
+    f = _traces_dir(data) / "results.json"
     if not f.exists():
-        raise HTTPException(404, "run `make traces` first")
+        raise HTTPException(404, f"no {data} traces yet: run `make traces`"
+                            + ("-real" if data == "real" else ""))
     return json.loads(f.read_text())
 
 
 @app.get("/episodes/{scenario}/{agent}")
-def episode(scenario: str, agent: str):
-    f = _traces_dir() / f"{scenario}_{agent}.json"
+def episode(scenario: str, agent: str, data: str = "synthetic"):
+    f = _traces_dir(data) / f"{scenario}_{agent}.json"
     if not f.exists():
-        raise HTTPException(404, f"no trace for {scenario}/{agent}")
+        raise HTTPException(404, f"no {data} trace for {scenario}/{agent}")
     return json.loads(f.read_text())
 
 
@@ -74,6 +77,7 @@ class SimRequest(BaseModel):
     scenario: str
     agent: str = "llm"  # noop | rules | llm | human
     seed: int = DEFAULT_SEED
+    data: str = "synthetic"
     faults: list[ChaosFault] = []
     clouds: list[ChaosClouds] = []
     human_actions: list[HumanAction] = []
@@ -86,11 +90,15 @@ def simulate(req: SimRequest):
     Deterministic given the same request, finishes in milliseconds (mock brain only)."""
     if req.scenario not in SCENARIOS:
         raise HTTPException(400, f"unknown scenario {req.scenario}")
+    if req.data not in ("synthetic", "real"):
+        raise HTTPException(400, f"unknown data mode {req.data}")
+    if req.data == "real" and not realdata.available():
+        raise HTTPException(400, "real data missing: run `python -m gauntlet.fetch_data --auto`")
     for item in [*req.faults, *req.clouds]:
         if item.park not in PARKS:
             raise HTTPException(400, f"unknown park {item.park}")
 
-    scenario = build(req.scenario, req.seed)
+    scenario = build(req.scenario, req.seed, data=req.data)
     for c in req.clouds:  # chaos clouds are weather: they belong in twin (and actual)
         lo, hi = sorted((c.start_step, c.end_step))
         factor = ramp_window(lo * 15, hi * 15, c.depth, ramp_min=15.0)
@@ -117,6 +125,8 @@ def simulate(req: SimRequest):
     trace["totals"]["floor_eur"] = round(floor, 2)
     trace["totals"]["oracle_eur"] = round(oracle, 2)
     trace["totals"]["score"] = round(score(trace["totals"]["cost_eur"], floor, oracle), 4)
+    trace["data"] = req.data
+    trace["day"] = scenario.day
     trace.pop("_cum_cost", None)
     return trace
 

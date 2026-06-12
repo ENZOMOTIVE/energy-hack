@@ -33,6 +33,7 @@ def collect_faults(scenario: Scenario, injected_faults: list | None = None) -> d
 def run_episode(scenario: Scenario, agent: Agent, floor_cum: np.ndarray | None = None,
                 injected_faults: list | None = None) -> dict:
     times = timestamps()
+    settle = scenario.settle_price if scenario.settle_price is not None else scenario.da_price
     park_ids = list(scenario.forecast.keys())
     schedule = {p: scenario.forecast[p].copy() for p in park_ids}
     actual = {p: np.zeros(N_STEPS) for p in park_ids}
@@ -74,9 +75,9 @@ def run_episode(scenario: Scenario, agent: Agent, floor_cum: np.ndarray | None =
                 new = float(np.clip(old + action.delta_mw, 0.0, PARKS[p]["p_mw"]))
                 applied = new - old
                 if applied < 0:
-                    cost += -applied * STEP_HOURS * BUYBACK_MULT * scenario.da_price[t]
+                    cost += -applied * STEP_HOURS * BUYBACK_MULT * settle[t]
                 elif applied > 0:
-                    cost -= applied * STEP_HOURS * SELLMORE_MULT * scenario.da_price[t]
+                    cost -= applied * STEP_HOURS * SELLMORE_MULT * settle[t]
                 schedule[p][t] = new
             entry = {"k": k, "type": "trade", "park": p, "delta_mw": round(action.delta_mw, 2),
                      "hours": action.hours, "start_step": t0, "reason": action.reason,
@@ -104,7 +105,7 @@ def run_episode(scenario: Scenario, agent: Agent, floor_cum: np.ndarray | None =
         for p in park_ids:
             gap = schedule[p][k] - actual[p][k]
             if gap > 0:
-                cost += gap * STEP_HOURS * IMBALANCE_MULT * scenario.da_price[k]
+                cost += gap * STEP_HOURS * IMBALANCE_MULT * settle[k]
         cum_cost[k] = cost
 
         step_records.append({

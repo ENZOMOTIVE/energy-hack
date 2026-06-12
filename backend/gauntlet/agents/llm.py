@@ -21,6 +21,10 @@ WEATHER_GAP_FRAC = 0.10  # of rated power on schedule-vs-twin -> trade trigger
 TRADE_COOLDOWN_STEPS = 4
 RESIDUAL_TRADE_HOURS = 2.0
 WEATHER_TRADE_HOURS = 3.0
+# selling surplus is asymmetrically risky: a vanished surplus becomes a 2x
+# imbalance penalty, so sell short horizons and partial size only
+SURPLUS_TRADE_HOURS = 1.0
+SURPLUS_FRACTION = 0.8
 
 
 def _eclipse_tranches(event, forecast):
@@ -71,6 +75,8 @@ class _TriggerState:
             cooldown_ok = k - self.last_trade_step.get(p, -10) >= TRADE_COOLDOWN_STEPS
             if gap_rem > threshold and prev_gap > threshold and cooldown_ok:
                 return ("weather", p, gap_rem)
+            if gap_rem < -threshold and prev_gap < -threshold and cooldown_ok:
+                return ("surplus", p, gap_rem)
         return None
 
 
@@ -112,6 +118,12 @@ class MockLLM(Agent):
             self.state.last_trade_step[p] = k
             return Action(type="trade", park=p, delta_mw=-gap, hours=RESIDUAL_TRADE_HOURS,
                           reason=f"Covering {gap:.1f} MW residual at {p} until the crew repairs the fault")
+        if kind == "surplus":
+            self.state.last_trade_step[p] = k
+            return Action(type="trade", park=p, delta_mw=-gap * SURPLUS_FRACTION,
+                          hours=SURPLUS_TRADE_HOURS,
+                          reason=(f"{p} is producing {-gap:.1f} MW above schedule: selling most "
+                                  f"of the surplus short-term instead of giving it away"))
         self.state.last_trade_step[p] = k
         return Action(type="trade", park=p, delta_mw=-gap, hours=WEATHER_TRADE_HOURS,
                       reason=(f"Actual tracks weather-expected at {p}: forecast bust, not hardware. "
@@ -122,7 +134,7 @@ SYSTEM_PROMPT = """You are an AI asset manager for a solar portfolio in a market
 Each call you get one observation and must return exactly one JSON action, no other text.
 Schema: {"action": "trade"|"dispatch_crew"|"noop", "park": "<id>", "delta_mw": <float>, "hours": <float>, "start_hour": <float or null>, "reason": "<one sentence>"}
 Rules: plant_gap = weather-expected minus actual (hardware problems). weather_gap = schedule minus weather-expected (forecast busts).
-Dispatch crew ONLY for sustained plant_gap. Trade negative delta_mw to buy back shortfalls. Use numbers from the observation only.
+Dispatch crew ONLY for sustained plant_gap. Trade negative delta_mw to buy back shortfalls; trade positive delta_mw to sell sustained surpluses (short horizons, surpluses fade). Use numbers from the observation only.
 A known future event (e.g. eclipse) should be pre-traded with start_hour at the event window."""
 
 MAX_CALLS = 12

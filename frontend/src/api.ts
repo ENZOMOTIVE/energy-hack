@@ -2,14 +2,20 @@ import type { Results, Trace } from './types'
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:8000'
 
-export async function fetchResults(): Promise<Results> {
-  const r = await fetch(`${API}/results`)
+export type DataSource = 'synthetic' | 'real'
+
+export async function fetchResults(data: DataSource = 'synthetic'): Promise<Results> {
+  const r = await fetch(`${API}/results?data=${data}`)
   if (!r.ok) throw new Error(`results: ${r.status}`)
   return r.json()
 }
 
-export async function fetchEpisode(scenario: string, agent: string): Promise<Trace> {
-  const r = await fetch(`${API}/episodes/${scenario}/${agent}`)
+export async function fetchEpisode(
+  scenario: string,
+  agent: string,
+  data: DataSource = 'synthetic',
+): Promise<Trace> {
+  const r = await fetch(`${API}/episodes/${scenario}/${agent}?data=${data}`)
   if (!r.ok) throw new Error(`episode: ${r.status}`)
   return r.json()
 }
@@ -37,6 +43,7 @@ export interface SimRequest {
   scenario: string
   agent: string
   seed?: number
+  data?: DataSource
   faults?: ChaosFault[]
   clouds?: ChaosClouds[]
   human_actions?: HumanAction[]

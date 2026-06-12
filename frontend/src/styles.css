@@ -52,6 +52,9 @@ td.cell:hover { background: #161b22; }
   border: none; font-weight: 700; letter-spacing: 1px; padding: 8px 18px;
 }
 .enter-arena:hover { filter: brightness(1.2); }
+.seg { float: right; margin-right: 12px; display: inline-flex; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
+.seg-btn { border: none; border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; padding: 8px 12px; color: #8b949e; }
+.seg-btn.active { background: #1f6feb; color: #fff; }
 select {
   background: #21262d; color: #e6edf3; border: 1px solid #30363d;
   border-radius: 6px; padding: 6px 10px; font-size: 14px;
