@@ -1,16 +1,21 @@
 """LLM worker with a deterministic mock fallback.
 
 MockLLM (default): same trigger logic, scripted decisions using the gap
-decomposition correctly. Used whenever GAUNTLET_USE_ANTHROPIC is unset or no
-ANTHROPIC_API_KEY is present, so the whole demo runs offline and reproducibly.
+decomposition correctly. Offline and reproducible; used when no provider env
+vars are set.
 
-LLMWorker: identical triggers decide WHEN to call the Anthropic API; the action
-itself comes from the model as forced JSON. Numbers are clamped by the engine
-and by this wrapper; reasons are the model's own words.
+LLMWorker: identical triggers decide WHEN to call the model; the action
+itself comes from the model as forced JSON. Supports two providers:
+  - anthropic: uses the Anthropic SDK (ANTHROPIC_API_KEY)
+  - deepseek: OpenAI-compatible (DEEPSEEK_API_KEY, base_url https://api.deepseek.com)
+
+Select via GAUNTLET_PROVIDER=anthropic|deepseek.
+Legacy: GAUNTLET_USE_ANTHROPIC=1 is equivalent to GAUNTLET_PROVIDER=anthropic.
 """
 
 import json
 import os
+import time
 
 import numpy as np
 
@@ -133,55 +138,157 @@ class MockLLM(Agent):
 SYSTEM_PROMPT = """You are an AI asset manager for a solar portfolio in a market simulation.
 Each call you get one observation and must return exactly one JSON action, no other text.
 Schema: {"action": "trade"|"dispatch_crew"|"noop", "park": "<id>", "delta_mw": <float>, "hours": <float>, "start_hour": <float or null>, "reason": "<one sentence>"}
-Rules: plant_gap = weather-expected minus actual (hardware problems). weather_gap = schedule minus weather-expected (forecast busts).
-Dispatch crew ONLY for sustained plant_gap. Trade negative delta_mw to buy back shortfalls; trade positive delta_mw to sell sustained surpluses (short horizons, surpluses fade). Use numbers from the observation only.
-A known future event (e.g. eclipse) should be pre-traded with start_hour at the event window."""
+Definitions: plant_gap = weather-expected minus actual (hardware problems). weather_gap = schedule minus weather-expected (forecast busts).
+You are only called after a monitoring layer has verified a persistent anomaly (2+ steps) or a known event. Untreated gaps settle as imbalance at 2x price, so act now; noop is only correct if every gap is under 10% of that park's p_mw. Three cases:
+1. plant_gap above 10% of p_mw: confirmed hardware fault. Dispatch crew for that park immediately, no further verification.
+2. weather_gap above 10% of p_mw while plant_gap is near 0: confirmed forecast bust, weather only. Never dispatch crew; trade delta_mw = -(weather_gap_mw). Hours: 3 if recent_weather_gap holds one sign steadily, but only 1 if it oscillates between positive and negative (a volatile day makes long positions stale and costly).
+3. weather_gap below -10% of p_mw: surplus. Sell it short: delta_mw = -(weather_gap_mw) * 0.8, hours exactly 1 (surpluses fade; an oversold position settles at 2x price).
+Use numbers from the observation only.
+Eclipse pre-trading: a solar_eclipse event lists tranches, each with start_hour (decimal, e.g. 19.25), hours and mean_lost_mw. When instructed to trade a tranche, take start_hour and hours from that tranche and set delta_mw = -(mean_lost_mw). Do NOT use the park's rated capacity. Do NOT leave start_hour null for future events."""
 
 MAX_CALLS = 12
 MIN_STEPS_BETWEEN_CALLS = 4
 
+_PROVIDER_DEFAULTS = {
+    "anthropic": "claude-sonnet-4-6",
+    "deepseek": "deepseek-chat",
+}
+
 
 class LLMWorker(Agent):
-    name = "llm"
-    brain = "anthropic"
+    """Real-model LLM worker. Provider selected at init time."""
 
-    def __init__(self, model: str | None = None):
-        from anthropic import Anthropic
-
-        self.client = Anthropic()
-        self.model = model or os.environ.get("GAUNTLET_MODEL", "claude-sonnet-4-6")
+    def __init__(self, provider: str = "anthropic", model: str | None = None):
+        self.provider = provider
+        self.model = model or os.environ.get("GAUNTLET_MODEL") or _PROVIDER_DEFAULTS.get(provider, "deepseek-chat")
+        self.name = provider  # trace file named after provider, e.g. S1_deepseek.json
+        self.brain = self.model
+        self._client = None
         self.state = _TriggerState()
         self.calls = 0
         self.last_call_step = -100
         self.step0_done = False
+        self._queue: list[Action] = []
+
+    def _get_client(self):
+        if self._client is not None:
+            return self._client
+        if self.provider == "anthropic":
+            from anthropic import Anthropic
+            self._client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        else:
+            from openai import OpenAI
+            self._client = OpenAI(
+                api_key=os.environ["DEEPSEEK_API_KEY"],
+                base_url="https://api.deepseek.com",
+            )
+        return self._client
 
     def act(self, obs: Obs) -> Action:
+        if self._queue:
+            return self._queue.pop(0)
         k = obs.step
-        should_call = False
         if k == 0 and obs.known_events and not self.step0_done:
             self.step0_done = True
-            should_call = True
-        elif self.state.update_and_check(obs) is not None:
-            should_call = True
-        if not should_call or self.calls >= MAX_CALLS or k - self.last_call_step < MIN_STEPS_BETWEEN_CALLS:
+            # one call per (park, tranche): the model can only emit one action per call
+            jobs = []
+            for ev in obs.known_events:
+                if ev.get("type") != "solar_eclipse":
+                    continue
+                for ti, (_, _, lost) in enumerate(_eclipse_tranches(ev, obs.forecast[ev["park"]])):
+                    if lost > 0.3:
+                        jobs.append((ev["park"], ti))
+            actions = []
+            for p, ti in jobs:
+                if self.calls >= MAX_CALLS:
+                    break
+                self.calls += 1
+                payload = self._payload_focused(obs, focus_park=p, tranche=ti)
+                actions.append(self._call_with_retry(payload, obs))
+            self.last_call_step = k
+            if not actions:
+                return Action.noop()
+            self._queue.extend(actions[1:])
+            return actions[0]
+        trig = self.state.update_and_check(obs)
+        if trig is None or self.calls >= MAX_CALLS or k - self.last_call_step < MIN_STEPS_BETWEEN_CALLS:
+            if trig is not None and trig[0] == "fault":
+                self._rearm_fault(trig[1])  # trigger consumed but call gated: re-ask later
             return Action.noop()
         self.calls += 1
         self.last_call_step = k
-        payload = self._payload(obs)
-        for _ in range(2):
+        action = self._call_with_retry(self._payload(obs), obs)
+        if trig[0] == "fault" and action.type != "dispatch_crew":
+            self._rearm_fault(trig[1])  # model declined: keep the trigger alive
+        return action
+
+    def _rearm_fault(self, park: str):
+        self.state.crew_sent.discard(park)
+        self.state.pending_residual.discard(park)
+
+    def _call_with_retry(self, payload: dict, obs: Obs) -> Action:
+        delays = [1.0, 2.0]
+        for attempt in range(3):
             try:
-                msg = self.client.messages.create(
-                    model=self.model, max_tokens=300, system=SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": json.dumps(payload)}],
-                )
-                return self._parse(msg.content[0].text, obs)
-            except Exception:
-                continue
+                text = self._complete(payload)
+                return self._parse(text, obs)
+            except Exception as exc:
+                code = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+                if code == 429 and attempt < 2:
+                    time.sleep(delays[attempt])
+                    continue
+                break
         return Action.noop()
+
+    def _complete(self, payload: dict) -> str:
+        client = self._get_client()
+        content = json.dumps(payload)
+        # temperature 0: leaderboard traces must be as reproducible as the API allows
+        if self.provider == "anthropic":
+            msg = client.messages.create(
+                model=self.model, max_tokens=300, temperature=0.0, system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": content}],
+            )
+            return msg.content[0].text
+        else:
+            resp = client.chat.completions.create(
+                model=self.model,
+                max_tokens=300,
+                temperature=0.0,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": content},
+                ],
+            )
+            return resp.choices[0].message.content
+
+    def _payload_focused(self, obs: Obs, focus_park: str, tranche: int) -> dict:
+        """Payload for a single (park, tranche) eclipse pre-trade decision."""
+        payload = self._payload(obs)
+        payload["known_events"] = [ev for ev in payload["known_events"] if ev.get("park") == focus_park]
+        payload["instruction"] = (
+            f"Pre-trade tranche index {tranche} of the eclipse at park {focus_park}. "
+            f"Take start_hour, hours and mean_lost_mw from tranches[{tranche}] of the event; "
+            f"delta_mw = -(mean_lost_mw)."
+        )
+        return payload
 
     def _payload(self, obs: Obs) -> dict:
         k = obs.step
         lo = max(0, k - 7)
+        events = []
+        for ev in obs.known_events:
+            ev = dict(ev)
+            if ev.get("type") == "solar_eclipse":
+                # the obscuration is a gaussian: a flat mean trade over the window
+                # over-buys the shoulders and under-buys the peak, so expose tranches
+                ev["tranches"] = [
+                    {"start_hour": round(start * 0.25, 2), "hours": round(n * 0.25, 2),
+                     "mean_lost_mw": round(lost, 1)}
+                    for start, n, lost in _eclipse_tranches(ev, obs.forecast[ev["park"]])
+                ]
+            events.append(ev)
         return {
             "step": k, "time": obs.time_iso,
             "parks": {
@@ -191,13 +298,15 @@ class LLMWorker(Agent):
                     "weather_gap_mw": round(float(obs.schedule[p][k] - obs.twin[p][k]), 2),
                     "recent_actual": [round(float(x), 1) for x in obs.actual[p][lo : k + 1]],
                     "recent_twin": [round(float(x), 1) for x in obs.twin[p][lo : k + 1]],
+                    "recent_weather_gap": [round(float(obs.schedule[p][i] - obs.twin[p][i]), 1)
+                                           for i in range(lo, k + 1)],
                     "schedule_now": round(float(obs.schedule[p][k]), 1),
                 }
                 for p in obs.forecast
             },
             "da_price_now": float(obs.da_price[k]),
             "da_price_next_3h": [float(x) for x in obs.da_price[k : min(96, k + 12)]],
-            "known_events": obs.known_events,
+            "known_events": events,
             "crew_dispatched": obs.crew_dispatched,
         }
 
@@ -221,6 +330,20 @@ class LLMWorker(Agent):
 
 
 def make_llm_agent() -> Agent:
-    if os.environ.get("GAUNTLET_USE_ANTHROPIC") and os.environ.get("ANTHROPIC_API_KEY"):
-        return LLMWorker()
+    """Returns MockLLM unless a real provider is configured."""
+    provider = os.environ.get("GAUNTLET_PROVIDER", "")
+    if not provider and os.environ.get("GAUNTLET_USE_ANTHROPIC") and os.environ.get("ANTHROPIC_API_KEY"):
+        provider = "anthropic"
+    if provider == "anthropic" and os.environ.get("ANTHROPIC_API_KEY"):
+        return LLMWorker(provider="anthropic")
+    if provider == "deepseek" and os.environ.get("DEEPSEEK_API_KEY"):
+        return LLMWorker(provider="deepseek")
     return MockLLM()
+
+
+def make_deepseek_agent() -> Agent:
+    return LLMWorker(provider="deepseek")
+
+
+def make_claude_agent() -> Agent:
+    return LLMWorker(provider="anthropic")

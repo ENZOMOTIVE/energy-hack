@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import realdata
+from .agents.llm import LLMWorker
 from .agents.scripted import ScriptedAgent
 from .config import DEFAULT_SEED, N_STEPS, PARKS, SCENARIOS
 from .oracle import oracle_cost
@@ -112,8 +113,8 @@ def simulate(req: SimRequest):
             agent = make_agent(req.agent)
         except ValueError as e:
             raise HTTPException(400, str(e))
-        if getattr(agent, "brain", None) == "anthropic":
-            raise HTTPException(400, "live simulate runs the mock brain only; unset GAUNTLET_USE_ANTHROPIC")
+        if isinstance(agent, LLMWorker):
+            raise HTTPException(400, "live simulate runs the mock brain only; use precomputed traces for real LLMs")
 
     from .agents.noop import DoNothingAgent
 

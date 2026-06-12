@@ -4,5 +4,6 @@ pandas
 fastapi
 uvicorn
 anthropic
+openai
 pytest
 httpx

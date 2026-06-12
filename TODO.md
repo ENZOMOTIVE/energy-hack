@@ -4,21 +4,21 @@ Done so far: full gym (SPEC.md + DEVPLAN.md, M1-M8), arena mode with chaos
 injection and judge-plays-it, real-data layer (Open-Meteo + SMARD) behind the
 SYNTHETIC/REAL toggle.
 
-## Priority 2: real LLMs (next up)
+## Priority 2: real LLMs
 
-1. Provider abstraction in `agents/llm.py`: one worker, pluggable completion
-   call selected by `GAUNTLET_PROVIDER=anthropic|deepseek`. DeepSeek is
-   OpenAI-compatible (base_url https://api.deepseek.com, models deepseek-chat /
-   deepseek-reasoner); use JSON mode for reliable action parsing. Needs
-   DEEPSEEK_API_KEY wiring, .env.example, 429 retry/backoff. MAX_CALLS=12 is
-   the cost guard.
-2. Real-model traces as extra leaderboard rows and arena fighters: agent ids
-   like `llm:deepseek`, `llm:claude`. Compare scores AND reasoning quality.
-3. Keep real models OUT of the live arena loop (precompute batch traces; the
-   reactive /simulate path stays mock-only, as already enforced).
-4. Gating tests stay on the mock brain (real LLMs are nondeterministic).
-5. Default DeepSeek model decision: deepseek-chat for the worker, one
-   deepseek-reasoner run for a "watch it think" moment.
+DONE: provider abstraction (`GAUNTLET_PROVIDER=anthropic|deepseek`), DeepSeek
+JSON mode at temperature 0 with 429 retry, `.env` / `.env.example`, `deepseek`
+as a leaderboard row on both boards (`make traces-deepseek`, results.json
+merge-aware), live /simulate still mock-only, tests still mock-only.
+Lessons already wired in: tranche-based eclipse payload, re-arm fault trigger
+when the model declines, recent_weather_gap series for whipsaw days.
+
+Still open:
+1. `claude` row: plumbing exists (`--agents claude`), needs ANTHROPIC_API_KEY
+   in .env, then add to traces-deepseek target (rename traces-llms).
+2. One deepseek-reasoner run for a "watch it think" moment in the pitch.
+3. Real-model rows as non-selectable arena fighters (today: leaderboard only;
+   arena fighters stay mock for instant re-simulation).
 
 ## Demo readiness
 

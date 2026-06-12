@@ -9,6 +9,11 @@ const CONTESTANTS: Record<string, string> = {
   noop: 'DO NOTHING',
   human: 'YOU (judge)',
 }
+// Real-brain agents are precomputed only; arena live-sim is mock-only
+export const REAL_BRAIN_LABELS: Record<string, string> = {
+  deepseek: 'DEEPSEEK',
+  claude: 'CLAUDE',
+}
 const PARKS = ['zaragoza', 'valencia', 'munich']
 const SCENARIO_LABELS: Record<string, string> = {
   S1: 'S1 cloud front',

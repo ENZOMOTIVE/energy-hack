@@ -10,9 +10,11 @@ const SCENARIO_LABELS: Record<string, string> = {
 const AGENT_LABELS: Record<string, string> = {
   noop: 'Do nothing',
   rules: 'Rule-based',
-  llm: 'LLM worker',
+  llm: 'LLM worker (mock)',
+  deepseek: 'DeepSeek chat',
+  claude: 'Claude Sonnet',
 }
-const AGENT_ORDER = ['noop', 'rules', 'llm']
+const AGENT_ORDER = ['noop', 'rules', 'llm', 'deepseek', 'claude']
 const SCENARIO_ORDER = ['S1', 'S2', 'S3']
 
 function scoreClass(s: number): string {
@@ -43,6 +45,7 @@ export default function Leaderboard({
   if (!rows) return <div className="loading">Loading leaderboard...</div>
 
   const days = [...new Set(rows.map((r) => r.day).filter(Boolean))]
+  const presentAgents = AGENT_ORDER.filter((ag) => rows.some((r) => r.agent === ag))
 
   const cell = (sc: string, ag: string) => {
     const r = rows.find((x) => x.scenario === sc && x.agent === ag)
@@ -60,6 +63,11 @@ export default function Leaderboard({
           <div className="cost">
             {r.mc.n} bad days: mean {Math.round(r.mc.mean * 100)}% | P10{' '}
             {Math.round(r.mc.p10 * 100)}%
+          </div>
+        )}
+        {r.brain && (
+          <div className="cost" style={{ color: '#58a6ff', fontSize: 11 }}>
+            {r.brain}
           </div>
         )}
       </td>
@@ -89,9 +97,9 @@ export default function Leaderboard({
           </tr>
         </thead>
         <tbody>
-          {AGENT_ORDER.map((ag) => (
+          {presentAgents.map((ag) => (
             <tr key={ag}>
-              <th>{AGENT_LABELS[ag]}</th>
+              <th>{AGENT_LABELS[ag] ?? ag}</th>
               {SCENARIO_ORDER.map((sc) => cell(sc, ag))}
             </tr>
           ))}
