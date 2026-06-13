@@ -27,10 +27,10 @@ from reportlab.platypus import (Image, Paragraph, SimpleDocTemplate, Spacer,  # 
 # so no generated battery contains one. Only categories present in the cases plot.
 CATEGORY_ORDER = ["FAULT", "WEATHER", "ECLIPSE", "COMBO"]
 WORKER_COLOR = {
-    "noop": "#8b949e", "rules": "#f85149", "llm": "#3fb950",
+    "noop": "#8b949e", "rules": "#f85149", "llm": "#3fb950", "claude": "#cc785c",
     "ds-cautious": "#58a6ff", "ds-balanced": "#a371f7", "ds-aggressive": "#d29922",
 }
-SHORT = {"noop": "None", "rules": "Rules", "llm": "Mock",
+SHORT = {"noop": "None", "rules": "Rules", "llm": "Mock", "claude": "Claude",
          "ds-cautious": "Cau", "ds-balanced": "Bal", "ds-aggressive": "Agg"}
 
 

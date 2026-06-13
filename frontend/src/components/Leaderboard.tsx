@@ -21,11 +21,11 @@ const AGENT_ORDER = [
   'noop',
   'rules',
   'llm',
+  'claude',
   'ds-cautious',
   'ds-balanced',
   'ds-aggressive',
   'deepseek',
-  'claude',
 ]
 const SCENARIO_ORDER = ['S1', 'S2', 'S3']
 
@@ -110,7 +110,10 @@ export default function Leaderboard({
         </thead>
         <tbody>
           {presentAgents.map((ag) => (
-            <tr key={ag} className={ag.startsWith('ds-') ? 'persona-row' : ''}>
+            <tr
+              key={ag}
+              className={ag.startsWith('ds-') ? 'persona-row' : ag === 'claude' ? 'claude-row' : ''}
+            >
               <th>{AGENT_LABELS[ag] ?? ag}</th>
               {SCENARIO_ORDER.map((sc) => cell(sc, ag))}
             </tr>

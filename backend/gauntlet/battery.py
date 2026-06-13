@@ -7,10 +7,10 @@ worst-case P10 (tail risk: the bad days behind the average), and the single
 hardest case per worker.
 
 The deterministic contestants (noop, rules, mock-llm) run offline here. Real
-DeepSeek personas are added afterwards by add_personas (needs the API key), once
-per case, and merged into the same per-case report basis so every worker is
-scored on the same unit. Their results are frozen into the battery JSON so the
-demo stays offline.
+model workers (Claude, the DeepSeek personas) are added afterwards by
+add_real_workers (needs the API keys), once per case, and merged into the same
+per-case report basis so every worker is scored on the same unit. Their results
+are frozen into the battery JSON so the demo stays offline.
 """
 
 import dataclasses
@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 
 from .agents import personas
-from .agents.llm import MockLLM, make_persona_agent
+from .agents.llm import MockLLM, make_claude_agent, make_persona_agent
 from .agents.noop import DoNothingAgent
 from .agents.rules import RuleAgent
 from .fitness import TAU
@@ -42,10 +42,23 @@ WORKER_META = {
     "rules": {"label": "Rule-based", "kind": "rules"},
     "llm": {"label": "LLM worker (mock)", "kind": "mock"},
 }
+# canonical display order across the leaderboard, battery report and charts
+WORKER_ORDER = ["noop", "rules", "llm", "claude", "ds-cautious", "ds-balanced", "ds-aggressive"]
 
 
 def _agent(name: str):
     return {"noop": DoNothingAgent, "rules": RuleAgent, "llm": MockLLM}[name]()
+
+
+def _real_agent(wid: str):
+    """A real-model (API-backed) worker by id: claude or a ds-* persona."""
+    return make_claude_agent() if wid == "claude" else make_persona_agent(wid)
+
+
+def _real_meta(wid: str) -> dict:
+    if wid == "claude":
+        return {"label": "Claude Sonnet", "kind": "claude"}
+    return {"label": personas.label(wid), "kind": "persona"}
 
 
 def _report_row(per_case_means: list, cases_out: list) -> dict:
@@ -102,14 +115,17 @@ def run_battery(battery: list, contestants=CONTESTANTS, mc_n: int = MC_N, seed0:
             "contestants": list(contestants), "workers": workers}
 
 
-def add_personas(payload: dict, persona_ids: list, max_workers: int = 8,
-                 base_seed: int = PERSONA_SEED0) -> dict:
-    """Run each DeepSeek persona once per case (API-bound) and merge into the report.
+def add_real_workers(payload: dict, worker_ids: list, max_workers: int = 6,
+                     base_seed: int = PERSONA_SEED0) -> dict:
+    """Run each real-model worker (claude or ds-* persona) once per case and merge.
 
-    Per-case base scenario plus floor/oracle are computed once (deterministic, no
-    API); only the persona episodes hit the network, run concurrently since they
-    are I/O bound. Personas are single-run per case; the report aggregates over
-    the same per-case basis as the deterministic workers."""
+    Additive and idempotent: it updates only the given worker_ids and preserves
+    any real workers already frozen into the battery, so claude can be added on
+    top of pre-existing personas (or vice versa). Per-case base scenario plus
+    floor/oracle are computed once (deterministic, no API); only the model
+    episodes hit the network, run concurrently since they are I/O bound. Real
+    workers are single-run per case; the report aggregates over the same per-case
+    basis as the deterministic workers."""
     cases = payload["cases"]
     bases = []
     for i, case in enumerate(cases):
@@ -117,37 +133,39 @@ def add_personas(payload: dict, persona_ids: list, max_workers: int = 8,
         floor = float(run_episode(sc, DoNothingAgent())["_cum_cost"][-1])
         bases.append((sc, floor, oracle_cost(sc)))
 
-    def run_one(i: int, pid: str):
+    def run_one(i: int, wid: str):
         sc, floor, oracle = bases[i]
         try:
-            cost = run_episode(sc, make_persona_agent(pid))["totals"]["cost_eur"]
-            return i, pid, score(cost, floor, oracle)
+            cost = run_episode(sc, _real_agent(wid))["totals"]["cost_eur"]
+            return i, wid, score(cost, floor, oracle)
         except Exception:
-            return i, pid, 0.0
+            return i, wid, 0.0
 
     results = {}
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
-        futs = [ex.submit(run_one, i, pid) for i in range(len(cases)) for pid in persona_ids]
+        futs = [ex.submit(run_one, i, wid) for i in range(len(cases)) for wid in worker_ids]
         for f in as_completed(futs):
-            i, pid, val = f.result()
-            results[(i, pid)] = val
+            i, wid, val = f.result()
+            results[(i, wid)] = val
 
-    per_case = {pid: [] for pid in persona_ids}
+    per_case = {wid: [] for wid in worker_ids}
     for i, case in enumerate(cases):
-        for pid in persona_ids:
-            s = results[(i, pid)]
-            case["agents"][pid] = {"mean": round(s, 4), "pass_rate": 1.0 if s >= TAU else 0.0,
+        for wid in worker_ids:
+            s = results[(i, wid)]
+            case["agents"][wid] = {"mean": round(s, 4), "pass_rate": 1.0 if s >= TAU else 0.0,
                                    "p10": round(s, 4), "single_run": True}
-            per_case[pid].append(s)
+            per_case[wid].append(s)
 
-    for pid in persona_ids:
-        payload["report"][pid] = _report_row(per_case[pid], cases)
-    # rebuild the workers roster, deduped, deterministic ids first then personas
-    base_workers = [w for w in payload.get("workers", []) if w["kind"] != "persona"]
-    persona_workers = [{"id": pid, "label": personas.label(pid), "kind": "persona"}
-                       for pid in persona_ids]
-    payload["workers"] = base_workers + persona_workers
-    payload["persona_single_run"] = True
+    for wid in worker_ids:
+        payload["report"][wid] = _report_row(per_case[wid], cases)
+    # merge into the roster, then sort by the canonical worker order
+    roster = {w["id"]: w for w in payload.get("workers", [])}
+    for wid in worker_ids:
+        roster[wid] = {"id": wid, **_real_meta(wid)}
+    payload["workers"] = sorted(
+        roster.values(),
+        key=lambda w: WORKER_ORDER.index(w["id"]) if w["id"] in WORKER_ORDER else 99)
+    payload["persona_single_run"] = True   # real workers are single-run per case
     return payload
 
 

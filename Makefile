@@ -2,7 +2,7 @@ PY := .venv/bin/python
 PIP := .venv/bin/pip
 PYTEST := .venv/bin/pytest
 
-.PHONY: setup traces traces-real traces-deepseek battery battery-personas fetch-data test api ui demo
+.PHONY: setup traces traces-real traces-deepseek battery battery-personas claude fetch-data test api ui demo
 
 setup:
 	python3 -m venv .venv
@@ -34,6 +34,15 @@ battery-personas:
 		rm -f ../traces/results.json ../traces/S?_deepseek.json && \
 		../$(PY) -m gauntlet.run --all && \
 		../$(PY) -m gauntlet.run --all --agents ds-cautious,ds-balanced,ds-aggressive
+
+# add a real Claude (sonnet) contestant to the leaderboard + all batteries
+# (needs ANTHROPIC_API_KEY; additive, keeps the mock and the DeepSeek personas)
+claude:
+	cd backend && set -a && . ../.env && set +a && \
+		../$(PY) -m gauntlet.run --all --agents claude && \
+		../$(PY) -m gauntlet.precompute --mode discrimination --add claude && \
+		../$(PY) -m gauntlet.precompute --mode adversarial_rules --add claude && \
+		../$(PY) -m gauntlet.precompute --mode adversarial_llm --add claude
 
 # real-model rows (needs DEEPSEEK_API_KEY; merges into existing results.json)
 traces-deepseek:

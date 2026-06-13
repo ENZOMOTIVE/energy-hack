@@ -23,6 +23,8 @@ td.cell:hover { background: #161b22; }
 /* group the DeepSeek persona rows visually on the leaderboard */
 tr.persona-row th:first-child { border-left: 3px solid #a371f7; }
 tr.persona-row th { color: #c9b6f0; }
+tr.claude-row th:first-child { border-left: 3px solid #cc785c; }
+tr.claude-row th { color: #e0a589; }
 .score { font-size: 22px; font-weight: 700; }
 .score.good { color: #3fb950; }
 .score.mid { color: #d29922; }

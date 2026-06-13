@@ -39,6 +39,37 @@ def test_persona_worker_identity():
     assert base.system_prompt != a.system_prompt
 
 
+def test_claude_worker_wiring():
+    """Claude resolves to an anthropic-backed worker and its battery metadata is
+    correct, without any API call (the client is lazy)."""
+    from gauntlet import battery as B
+
+    a = B._real_agent("claude")
+    assert a.provider == "anthropic" and a.model == "claude-sonnet-4-6"
+    assert B._real_meta("claude") == {"label": "Claude Sonnet", "kind": "claude"}
+    assert B._real_meta("ds-cautious")["kind"] == "persona"
+    # claude sits right after the mock llm in the canonical order
+    assert B.WORKER_ORDER.index("claude") == B.WORKER_ORDER.index("llm") + 1
+
+
+def test_add_real_workers_merges_additively(monkeypatch):
+    """add_real_workers preserves already-frozen workers and keeps the roster in
+    canonical order. Offline: the real worker is stubbed with a no-op agent."""
+    from gauntlet import battery as B
+    from gauntlet.agents.noop import DoNothingAgent
+    from gauntlet.generator import generate_battery
+
+    monkeypatch.setattr(B, "_real_agent", lambda wid: DoNothingAgent())
+    payload = B.run_battery(generate_battery("discrimination", k=2, pop=20, gens=1, seed=0), mc_n=1)
+    B.add_real_workers(payload, ["ds-balanced"], max_workers=2)   # a persona first
+    B.add_real_workers(payload, ["claude"], max_workers=2)        # then claude, additively
+
+    ids = [w["id"] for w in payload["workers"]]
+    assert ids == ["noop", "rules", "llm", "claude", "ds-balanced"]  # canonical order, persona kept
+    assert "claude" in payload["report"] and "ds-balanced" in payload["report"]
+    assert payload["workers"][3] == {"id": "claude", "label": "Claude Sonnet", "kind": "claude"}
+
+
 def test_declined_fault_does_not_burn_the_call_budget():
     """A worker that keeps declining the crew on a persistent fault (the cautious
     'hedge a small fault and wait' path) must NOT re-trigger it every step and

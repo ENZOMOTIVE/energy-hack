@@ -39,6 +39,7 @@ const WORKER_COLOR: Record<string, string> = {
   noop: '#8b949e',
   rules: '#f85149',
   llm: '#3fb950',
+  claude: '#cc785c',
   'ds-cautious': '#58a6ff',
   'ds-balanced': '#a371f7',
   'ds-aggressive': '#d29922',
@@ -46,6 +47,7 @@ const WORKER_COLOR: Record<string, string> = {
 const SHORT: Record<string, string> = {
   rules: 'Rules',
   llm: 'Mock',
+  claude: 'Claude',
   'ds-cautious': 'Cautious',
   'ds-balanced': 'Balanced',
   'ds-aggressive': 'Aggressive',
@@ -132,7 +134,7 @@ export default function Generator({ onBack }: { onBack: () => void }) {
           <p style={{ color: '#8b949e', fontStyle: 'italic', marginTop: 8 }}>
             {MODE_BLURB[mode]} {battery.k} days; deterministic workers averaged over {battery.mc_n}{' '}
             Monte-Carlo variations
-            {battery.persona_single_run ? ', DeepSeek personas one run per day (API-bound)' : ''}.
+            {battery.persona_single_run ? ', real models (Claude, DeepSeek) one run per day (API-bound)' : ''}.
           </p>
 
           <Report battery={battery} />
@@ -161,7 +163,9 @@ function Report({ battery }: { battery: Battery }) {
             <div key={w.id} style={{ display: 'contents' }}>
               <div className="cert-agent" style={{ color: color(w.id) }}>
                 {w.label}
-                {w.kind === 'persona' && <span className="cert-tag">1 run</span>}
+                {(w.kind === 'persona' || w.kind === 'claude') && (
+                  <span className="cert-tag">1 run</span>
+                )}
               </div>
               <div className="cert-bar-cell">
                 <div className="cert-bar-track">
