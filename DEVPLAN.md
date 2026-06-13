@@ -22,6 +22,7 @@ keeps the verification gates green and note the choice in a code comment.
    all scenarios is 2026-08-12, 00:00 to 23:45, 96 steps of 15 minutes.
    Step index k covers [k*15min, (k+1)*15min). step_hours = 0.25.
 
+
 ## 1. Repository layout (exact)
 
 ```
