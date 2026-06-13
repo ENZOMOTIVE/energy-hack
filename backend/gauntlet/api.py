@@ -6,12 +6,12 @@ import os
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import realdata
+from . import realdata, report
 from .agents.llm import LLMWorker
 from .agents.scripted import ScriptedAgent
 from .config import DEFAULT_SEED, N_STEPS, PARKS, SCENARIOS
@@ -62,14 +62,34 @@ def batteries():
     return {"modes": sorted(f.stem for f in d.glob("*.json"))}
 
 
-@app.get("/battery/{mode}")
-def battery(mode: str):
-    """One generated battery (cases + per-agent tail-risk report). Precomputed,
-    offline; generation itself runs via `python -m gauntlet.generate`."""
+def _load_battery(mode: str) -> dict:
     f = REPO_ROOT / "traces" / "battery" / f"{mode.replace(':', '_')}.json"
     if not f.exists():
         raise HTTPException(404, f"no battery '{mode}': run `make battery`")
     return json.loads(f.read_text())
+
+
+@app.get("/battery/{mode}")
+def battery(mode: str):
+    """One generated battery (cases + per-worker tail-risk report). Precomputed,
+    offline; generation itself runs via `python -m gauntlet.generate`."""
+    return _load_battery(mode)
+
+
+@app.get("/report/battery/{mode}.csv")
+def report_csv(mode: str):
+    """CSV of the generated cases plus every worker's per-case score and pass flag."""
+    csv_text = report.battery_csv(_load_battery(mode))
+    return Response(content=csv_text, media_type="text/csv", headers={
+        "Content-Disposition": f'attachment; filename="gauntlet_{mode}_cases.csv"'})
+
+
+@app.get("/report/battery/{mode}.pdf")
+def report_pdf(mode: str):
+    """Typeset PDF: certification table, the two comparison charts, case appendix."""
+    pdf = report.battery_pdf(_load_battery(mode), mode)
+    return Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="gauntlet_{mode}_report.pdf"'})
 
 
 class ChaosFault(BaseModel):

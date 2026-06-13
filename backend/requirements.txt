@@ -5,5 +5,7 @@ fastapi
 uvicorn
 anthropic
 openai
+reportlab
+matplotlib
 pytest
 httpx

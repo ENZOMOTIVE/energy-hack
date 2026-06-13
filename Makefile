@@ -2,7 +2,7 @@ PY := .venv/bin/python
 PIP := .venv/bin/pip
 PYTEST := .venv/bin/pytest
 
-.PHONY: setup traces traces-real traces-deepseek battery fetch-data test api ui demo
+.PHONY: setup traces traces-real traces-deepseek battery battery-personas fetch-data test api ui demo
 
 setup:
 	python3 -m venv .venv
@@ -23,6 +23,17 @@ battery:
 	cd backend && ../$(PY) -m gauntlet.generate --mode discrimination --seed 0
 	cd backend && ../$(PY) -m gauntlet.generate --mode adversarial --target rules --seed 0
 	cd backend && ../$(PY) -m gauntlet.generate --mode adversarial --target llm --seed 0
+
+# real DeepSeek persona rows: battery comparison + synthetic leaderboard
+# (needs DEEPSEEK_API_KEY; retires the generic deepseek row in favour of the personas)
+battery-personas:
+	cd backend && set -a && . ../.env && set +a && \
+		../$(PY) -m gauntlet.precompute --mode discrimination && \
+		../$(PY) -m gauntlet.precompute --mode adversarial_rules && \
+		../$(PY) -m gauntlet.precompute --mode adversarial_llm && \
+		rm -f ../traces/results.json ../traces/S?_deepseek.json && \
+		../$(PY) -m gauntlet.run --all && \
+		../$(PY) -m gauntlet.run --all --agents ds-cautious,ds-balanced,ds-aggressive
 
 # real-model rows (needs DEEPSEEK_API_KEY; merges into existing results.json)
 traces-deepseek:

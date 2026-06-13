@@ -6,8 +6,10 @@ from pathlib import Path
 
 import numpy as np
 
-from .agents.llm import MockLLM, make_claude_agent, make_deepseek_agent, make_llm_agent
+from .agents.llm import (MockLLM, make_claude_agent, make_deepseek_agent,
+                         make_llm_agent, make_persona_agent)
 from .agents.noop import DoNothingAgent
+from .agents.personas import PERSONA_IDS
 from .agents.rules import RuleAgent
 from .config import DEFAULT_SEED, SCENARIOS
 from .oracle import oracle_cost
@@ -34,6 +36,8 @@ def make_agent(name: str):
         return make_deepseek_agent()
     if name == "claude":
         return make_claude_agent()
+    if name in PERSONA_IDS:
+        return make_persona_agent(name)
     raise ValueError(f"unknown agent {name}")
 
 

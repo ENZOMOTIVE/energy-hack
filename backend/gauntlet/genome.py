@@ -54,6 +54,14 @@ class CaseGenome:
     eclipse: bool = False
     price_spike: float = 1.0
 
+    @classmethod
+    def from_dict(cls, d: dict) -> "CaseGenome":
+        """Reconstruct a genome from its dataclasses.asdict form (stored in batteries)."""
+        busts = [Bust(**b) for b in d.get("busts", [])]
+        fault = Fault(**d["fault"]) if d.get("fault") else None
+        return cls(busts=busts, fault=fault, eclipse=bool(d.get("eclipse", False)),
+                   price_spike=float(d.get("price_spike", 1.0)))
+
     # ---- identity / caching ----
     def key(self) -> tuple:
         bk = tuple(sorted((b.park, b.start, b.end, round(b.depth, 3), b.sign) for b in self.busts))
