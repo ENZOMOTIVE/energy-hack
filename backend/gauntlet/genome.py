@@ -129,6 +129,22 @@ class CaseGenome:
             (self.price_spike - 1.0) / (SPIKE_HI - 1.0),
         ])
 
+    # ---- coarse failure-mode category (for grouping in the comparison graphs) ----
+    def category(self) -> str:
+        """One of ECLIPSE | COMBO | FAULT | WEATHER | CALM.
+
+        Eclipse is the defining skill when present; otherwise a day with both a
+        fault and a weather bust is a COMBO (you must disentangle them)."""
+        if self.eclipse:
+            return "ECLIPSE"
+        if self.fault and self.busts:
+            return "COMBO"
+        if self.fault:
+            return "FAULT"
+        if self.busts:
+            return "WEATHER"
+        return "CALM"
+
     # ---- human-readable failure-mode tag ----
     def label(self) -> str:
         parts = []

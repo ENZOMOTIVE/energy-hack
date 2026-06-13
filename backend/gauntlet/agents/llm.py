@@ -19,6 +19,7 @@ import time
 
 import numpy as np
 
+from . import personas
 from .base import Action, Agent, Obs
 
 PLANT_GAP_FRAC = 0.10  # of rated power, 2 consecutive steps -> fault
@@ -156,12 +157,26 @@ _PROVIDER_DEFAULTS = {
 
 
 class LLMWorker(Agent):
-    """Real-model LLM worker. Provider selected at init time."""
+    """Real-model LLM worker. Provider and (optional) persona selected at init.
 
-    def __init__(self, provider: str = "anthropic", model: str | None = None):
+    A persona appends a doctrine paragraph to the system prompt and renames the
+    worker after the persona id, so the same model fields several distinct
+    contestants (e.g. ds-cautious, ds-balanced, ds-aggressive)."""
+
+    def __init__(self, provider: str = "anthropic", model: str | None = None,
+                 persona: str | None = None):
         self.provider = provider
         self.model = model or os.environ.get("GAUNTLET_MODEL") or _PROVIDER_DEFAULTS.get(provider, "deepseek-chat")
-        self.name = provider  # trace file named after provider, e.g. S1_deepseek.json
+        self.persona = persona
+        if persona:
+            spec = personas.PERSONAS[persona]
+            self.name = persona  # trace file + leaderboard row, e.g. S1_ds-cautious.json
+            self.label = spec["label"]
+            self.system_prompt = SYSTEM_PROMPT + "\n" + spec["doctrine"]
+        else:
+            self.name = provider  # e.g. S1_deepseek.json
+            self.label = provider
+            self.system_prompt = SYSTEM_PROMPT
         self.brain = self.model
         self._client = None
         self.state = _TriggerState()
@@ -243,10 +258,10 @@ class LLMWorker(Agent):
     def _complete(self, payload: dict) -> str:
         client = self._get_client()
         content = json.dumps(payload)
-        # temperature 0: leaderboard traces must be as reproducible as the API allows
+        # temperature 0: traces must be as reproducible as the API allows
         if self.provider == "anthropic":
             msg = client.messages.create(
-                model=self.model, max_tokens=300, temperature=0.0, system=SYSTEM_PROMPT,
+                model=self.model, max_tokens=300, temperature=0.0, system=self.system_prompt,
                 messages=[{"role": "user", "content": content}],
             )
             return msg.content[0].text
@@ -257,7 +272,7 @@ class LLMWorker(Agent):
                 temperature=0.0,
                 response_format={"type": "json_object"},
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": content},
                 ],
             )
@@ -347,3 +362,9 @@ def make_deepseek_agent() -> Agent:
 
 def make_claude_agent() -> Agent:
     return LLMWorker(provider="anthropic")
+
+
+def make_persona_agent(persona_id: str) -> Agent:
+    """A real-model worker running one of the named personas (deepseek by default)."""
+    spec = personas.PERSONAS[persona_id]
+    return LLMWorker(provider=spec.get("provider", "deepseek"), persona=persona_id)
