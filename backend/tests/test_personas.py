@@ -70,6 +70,39 @@ def test_add_real_workers_merges_additively(monkeypatch):
     assert payload["workers"][3] == {"id": "claude", "label": "Claude Sonnet", "kind": "claude"}
 
 
+def test_llm_contestant_is_always_the_mock(monkeypatch):
+    """The displayed 'llm' row is the deterministic mock even when a real provider
+    is configured in the env: no silent DeepSeek hijack of the baseline row."""
+    from gauntlet.agents.llm import MockLLM
+    from gauntlet.run import make_agent
+
+    monkeypatch.setenv("GAUNTLET_PROVIDER", "deepseek")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test-not-used")
+    assert isinstance(make_agent("llm"), MockLLM)
+
+
+def test_residual_hedge_fires_right_after_dispatch():
+    """Fix B: the residual buyback must not be gated out by the call cooldown.
+    A stub that dispatches on the fault and hedges on the residual should produce
+    both actions (without the fix the residual is swallowed one step later)."""
+    from gauntlet.scenarios import build
+    from gauntlet.sim import run_episode
+
+    class Stub(LLMWorker):
+        def __init__(self):
+            super().__init__(provider="deepseek", persona="ds-balanced")
+
+        def _call_with_retry(self, payload, obs):
+            if "already on its way" in payload.get("instruction", ""):
+                return Action(type="trade", park="zaragoza", delta_mw=-5.0, hours=2.0)
+            return Action(type="dispatch_crew", park="zaragoza")
+
+    t = run_episode(build("S2", 42), Stub())
+    types = [s["action"]["type"] for s in t["steps"]
+             if s.get("action") and s["action"]["type"] != "noop"]
+    assert "dispatch_crew" in types and "trade" in types
+
+
 def test_declined_fault_does_not_burn_the_call_budget():
     """A worker that keeps declining the crew on a persistent fault (the cautious
     'hedge a small fault and wait' path) must NOT re-trigger it every step and

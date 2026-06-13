@@ -20,6 +20,7 @@ import time
 import numpy as np
 
 from . import personas
+from ..config import REPAIR_STEPS
 from .base import Action, Agent, Obs
 
 PLANT_GAP_FRAC = 0.10  # of rated power, 2 consecutive steps -> fault
@@ -81,7 +82,11 @@ class _TriggerState:
             cooldown_ok = k - self.last_trade_step.get(p, -10) >= TRADE_COOLDOWN_STEPS
             if gap_rem > threshold and prev_gap > threshold and cooldown_ok:
                 return ("weather", p, gap_rem)
-            if gap_rem < -threshold and prev_gap < -threshold and cooldown_ok:
+            # do NOT sell "surplus" on a park whose fault we are repairing: the
+            # recovering production after a residual buyback is not real surplus,
+            # and selling it churns the schedule into a costly oscillation.
+            if (gap_rem < -threshold and prev_gap < -threshold and cooldown_ok
+                    and p not in self.crew_sent):
                 return ("surplus", p, gap_rem)
         return None
 
@@ -228,13 +233,28 @@ class LLMWorker(Agent):
             self._queue.extend(actions[1:])
             return actions[0]
         trig = self.state.update_and_check(obs)
-        if trig is None or self.calls >= MAX_CALLS or k - self.last_call_step < MIN_STEPS_BETWEEN_CALLS:
-            if trig is not None and trig[0] == "fault":
+        if trig is None:
+            return Action.noop()
+        # a residual hedge is a high-value immediate follow-up to a dispatch the
+        # model just made; don't let the cooldown swallow it (that flattened every
+        # model to the same score on pure-fault days). the hard call cap still holds.
+        on_cooldown = k - self.last_call_step < MIN_STEPS_BETWEEN_CALLS and trig[0] != "residual"
+        if self.calls >= MAX_CALLS or on_cooldown:
+            if trig[0] == "fault":
                 self._maybe_retry_fault(trig[1])  # call gated: re-ask later, but bounded
             return Action.noop()
         self.calls += 1
         self.last_call_step = k
-        action = self._call_with_retry(self._payload(obs), obs)
+        payload = self._payload(obs)
+        if trig[0] == "residual":
+            p = trig[1]
+            repair_h = REPAIR_STEPS * 0.25
+            payload["instruction"] = (
+                f"A repair crew is already on its way to {p} and will fix the fault in about "
+                f"{repair_h:.0f} hours; do NOT dispatch another crew. Buy back the production "
+                f"shortfall at {p} (negative delta_mw) for about {repair_h:.0f} hours to cover it "
+                f"until then; a longer hedge overpays for output you will deliver once repaired.")
+        action = self._call_with_retry(payload, obs)
         if trig[0] == "fault" and action.type != "dispatch_crew":
             self._maybe_retry_fault(trig[1])  # model declined the crew (e.g. cautious hedging)
         return action

@@ -10,7 +10,7 @@ const SCENARIO_LABELS: Record<string, string> = {
 const AGENT_LABELS: Record<string, string> = {
   noop: 'Do nothing',
   rules: 'Rule-based',
-  llm: 'LLM worker (mock)',
+  llm: 'Reference agent',
   'ds-cautious': 'DeepSeek Cautious',
   'ds-balanced': 'DeepSeek Balanced',
   'ds-aggressive': 'DeepSeek Aggressive',

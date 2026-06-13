@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .agents.llm import (MockLLM, make_claude_agent, make_deepseek_agent,
-                         make_llm_agent, make_persona_agent)
+                         make_persona_agent)
 from .agents.noop import DoNothingAgent
 from .agents.personas import PERSONA_IDS
 from .agents.rules import RuleAgent
@@ -31,7 +31,11 @@ def make_agent(name: str):
     if name == "rules":
         return RuleAgent()
     if name == "llm":
-        return make_llm_agent()
+        # the displayed 'llm' contestant is ALWAYS the deterministic mock (the
+        # Reference agent), never a real provider: GAUNTLET_PROVIDER must not
+        # silently turn this row into DeepSeek. Real models have their own ids
+        # (claude, deepseek, ds-*).
+        return MockLLM()
     if name == "deepseek":
         return make_deepseek_agent()
     if name == "claude":

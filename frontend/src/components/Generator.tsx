@@ -46,7 +46,7 @@ const WORKER_COLOR: Record<string, string> = {
 }
 const SHORT: Record<string, string> = {
   rules: 'Rules',
-  llm: 'Mock',
+  llm: 'Reference',
   claude: 'Claude',
   'ds-cautious': 'Cautious',
   'ds-balanced': 'Balanced',

@@ -40,7 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKER_META = {
     "noop": {"label": "Do nothing", "kind": "baseline"},
     "rules": {"label": "Rule-based", "kind": "rules"},
-    "llm": {"label": "LLM worker (mock)", "kind": "mock"},
+    "llm": {"label": "Reference agent", "kind": "reference"},
 }
 # canonical display order across the leaderboard, battery report and charts
 WORKER_ORDER = ["noop", "rules", "llm", "claude", "ds-cautious", "ds-balanced", "ds-aggressive"]

@@ -30,7 +30,7 @@ WORKER_COLOR = {
     "noop": "#8b949e", "rules": "#f85149", "llm": "#3fb950", "claude": "#cc785c",
     "ds-cautious": "#58a6ff", "ds-balanced": "#a371f7", "ds-aggressive": "#d29922",
 }
-SHORT = {"noop": "None", "rules": "Rules", "llm": "Mock", "claude": "Claude",
+SHORT = {"noop": "None", "rules": "Rules", "llm": "Ref", "claude": "Claude",
          "ds-cautious": "Cau", "ds-balanced": "Bal", "ds-aggressive": "Agg"}
 
 
@@ -148,8 +148,9 @@ def battery_pdf(payload: dict, mode: str) -> bytes:
               "(do-nothing cost minus a perfect-foresight oracle) and for separating competent "
               "agents from naive ones. Every worker is scored as the share of the recoverable loss "
               "it recovers, bracketed between the oracle (100%) and doing nothing (0%). Deterministic "
-              "workers are averaged over Monte-Carlo jitter per day; DeepSeek personas are a single "
-              "run per day (API-bound) and labelled as such. Pass-rate is the share of days scoring "
+              "workers are averaged over Monte-Carlo jitter per day; real model workers (Claude, the "
+              "DeepSeek personas) are a single run per day (API-bound) and labelled as such. Pass-rate "
+              "is the share of days scoring "
               "at least 50%; worst-case P10 is the tenth-percentile day, the tail behind the average.")
     elems.append(Paragraph(method, styles["BodyText"]))
     elems.append(Spacer(1, 0.3 * cm))
