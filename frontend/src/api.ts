@@ -70,6 +70,7 @@ export interface AgentKpis {
 export interface BatteryCase {
   name: string
   label: string
+  category: string
   stake: number
   floor: number
   oracle: number
@@ -79,14 +80,28 @@ export interface BatteryCase {
 export interface AgentReport extends AgentKpis {
   hardest: { name: string; label: string; mean: number }
 }
+export interface WorkerInfo {
+  id: string
+  label: string
+  kind: string
+}
 export interface Battery {
   mode: string
   seed: number
   mc_n: number
   k: number
   contestants: string[]
+  workers: WorkerInfo[]
   cases: BatteryCase[]
   report: Record<string, AgentReport>
+  persona_single_run?: boolean
+}
+
+export function reportCsvUrl(mode: string): string {
+  return `${API}/report/battery/${mode}.csv`
+}
+export function reportPdfUrl(mode: string): string {
+  return `${API}/report/battery/${mode}.pdf`
 }
 
 export async function fetchBatteryModes(): Promise<string[]> {

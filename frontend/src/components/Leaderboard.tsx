@@ -11,10 +11,22 @@ const AGENT_LABELS: Record<string, string> = {
   noop: 'Do nothing',
   rules: 'Rule-based',
   llm: 'LLM worker (mock)',
+  'ds-cautious': 'DeepSeek Cautious',
+  'ds-balanced': 'DeepSeek Balanced',
+  'ds-aggressive': 'DeepSeek Aggressive',
   deepseek: 'DeepSeek chat',
   claude: 'Claude Sonnet',
 }
-const AGENT_ORDER = ['noop', 'rules', 'llm', 'deepseek', 'claude']
+const AGENT_ORDER = [
+  'noop',
+  'rules',
+  'llm',
+  'ds-cautious',
+  'ds-balanced',
+  'ds-aggressive',
+  'deepseek',
+  'claude',
+]
 const SCENARIO_ORDER = ['S1', 'S2', 'S3']
 
 function scoreClass(s: number): string {
