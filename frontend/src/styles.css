@@ -98,3 +98,45 @@ button.chaos {
 button.chaos:hover:not(:disabled) { background: #58181b; }
 button.chaos:disabled { opacity: 0.4; cursor: not-allowed; }
 .judge-bar button { border-color: #d29922; color: #e3b341; font-weight: 700; }
+
+/* generator / test lab */
+.enter-lab {
+  float: right; margin-right: 12px; background: linear-gradient(135deg, #6e40c9, #1f6feb);
+  border: none; font-weight: 700; letter-spacing: 1px; padding: 8px 18px; color: #fff;
+}
+.enter-lab:hover { filter: brightness(1.2); }
+.gen-modes { display: inline-flex; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; margin: 6px 0 4px; }
+.cert {
+  margin-top: 18px; border: 1px solid #30363d; border-radius: 10px;
+  background: #11151c; padding: 14px 16px;
+}
+.cert-title { font-size: 12px; font-weight: 800; letter-spacing: 2px; color: #8b949e; margin-bottom: 12px; }
+.cert-grid {
+  display: grid; grid-template-columns: auto 1.4fr auto auto 2fr;
+  gap: 12px 18px; align-items: center;
+}
+.cert-head { font-size: 11px; color: #6e7681; text-transform: uppercase; letter-spacing: 1px; }
+.cert-agent { font-weight: 700; font-size: 15px; }
+.cert-bar-cell { display: flex; align-items: center; gap: 10px; }
+.cert-bar-track { flex: 1; height: 14px; background: #21262d; border-radius: 7px; overflow: hidden; min-width: 120px; }
+.cert-bar-fill { height: 100%; border-radius: 7px; transition: width 0.4s ease; }
+.cert-bar-num { font-variant-numeric: tabular-nums; font-weight: 700; width: 42px; }
+.cert-num { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 16px; }
+.cert-hardest { color: #8b949e; font-size: 13px; }
+.cert-hardest-score { color: #f85149; font-weight: 700; }
+
+.case-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px; margin-top: 10px;
+}
+.case-card {
+  border: 1px solid #30363d; border-left: 4px solid #6e40c9; border-radius: 8px;
+  padding: 10px 12px; background: #161b22;
+}
+.case-name { font-size: 11px; color: #6e7681; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+.case-label { font-weight: 600; font-size: 13px; margin: 3px 0 6px; line-height: 1.35; }
+.case-stake { color: #d29922; font-size: 12px; font-weight: 700; }
+.case-agents { display: flex; gap: 14px; margin-top: 8px; }
+.case-chip { display: flex; flex-direction: column; }
+.case-chip-name { color: #6e7681; font-size: 11px; }
+.case-chip-score { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { DataSource } from './api'
 import Arena from './components/Arena'
+import Generator from './components/Generator'
 import Leaderboard from './components/Leaderboard'
 import Replay from './components/Replay'
 
@@ -8,6 +9,7 @@ type View =
   | { kind: 'board' }
   | { kind: 'replay'; scenario: string; agent: string }
   | { kind: 'arena' }
+  | { kind: 'generator' }
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: 'board' })
@@ -18,9 +20,14 @@ export default function App() {
         GAUNTLET
         <span className="sub">the proving ground for solar asset-management agents</span>
         {view.kind === 'board' && (
-          <button className="enter-arena" onClick={() => setView({ kind: 'arena' })}>
-            ENTER ARENA
-          </button>
+          <>
+            <button className="enter-arena" onClick={() => setView({ kind: 'arena' })}>
+              ENTER ARENA
+            </button>
+            <button className="enter-lab" onClick={() => setView({ kind: 'generator' })}>
+              TEST LAB
+            </button>
+          </>
         )}
         <span className="seg">
           {(['synthetic', 'real'] as DataSource[]).map((d) => (
@@ -49,6 +56,7 @@ export default function App() {
         />
       )}
       {view.kind === 'arena' && <Arena data={data} onBack={() => setView({ kind: 'board' })} />}
+      {view.kind === 'generator' && <Generator onBack={() => setView({ kind: 'board' })} />}
     </div>
   )
 }

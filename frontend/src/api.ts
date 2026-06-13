@@ -59,3 +59,44 @@ export async function simulate(req: SimRequest): Promise<Trace> {
   if (!r.ok) throw new Error(`simulate: ${r.status}`)
   return r.json()
 }
+
+// ---- intelligent test-case generator ----
+
+export interface AgentKpis {
+  mean: number
+  pass_rate: number
+  p10: number
+}
+export interface BatteryCase {
+  name: string
+  label: string
+  stake: number
+  floor: number
+  oracle: number
+  fitness: number
+  agents: Record<string, AgentKpis>
+}
+export interface AgentReport extends AgentKpis {
+  hardest: { name: string; label: string; mean: number }
+}
+export interface Battery {
+  mode: string
+  seed: number
+  mc_n: number
+  k: number
+  contestants: string[]
+  cases: BatteryCase[]
+  report: Record<string, AgentReport>
+}
+
+export async function fetchBatteryModes(): Promise<string[]> {
+  const r = await fetch(`${API}/batteries`)
+  if (!r.ok) throw new Error(`batteries: ${r.status}`)
+  return (await r.json()).modes
+}
+
+export async function fetchBattery(mode: string): Promise<Battery> {
+  const r = await fetch(`${API}/battery/${mode}`)
+  if (!r.ok) throw new Error(`battery: ${r.status}`)
+  return r.json()
+}
