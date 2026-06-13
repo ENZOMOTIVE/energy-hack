@@ -43,6 +43,13 @@ const WORKER_COLOR: Record<string, string> = {
   'ds-balanced': '#a371f7',
   'ds-aggressive': '#d29922',
 }
+const SHORT: Record<string, string> = {
+  rules: 'Rules',
+  llm: 'Mock',
+  'ds-cautious': 'Cautious',
+  'ds-balanced': 'Balanced',
+  'ds-aggressive': 'Aggressive',
+}
 const CATEGORY_ORDER = ['FAULT', 'WEATHER', 'ECLIPSE', 'COMBO']
 
 const color = (id: string) => WORKER_COLOR[id] ?? '#888'
@@ -186,7 +193,7 @@ function Comparison({ battery }: { battery: Battery }) {
     const row: Record<string, number | string> = { category: cat }
     const inCat = battery.cases.filter((c) => c.category === cat)
     for (const w of battery.workers) {
-      const vals = inCat.map((c) => c.agents[w.id].mean * 100)
+      const vals = inCat.map((c) => (c.agents[w.id]?.mean ?? 0) * 100)
       row[w.id] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0
     }
     return row
@@ -251,6 +258,7 @@ function Comparison({ battery }: { battery: Battery }) {
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {battery.workers.map((w) => {
                 const r = battery.report[w.id]
+                if (!r) return null
                 return (
                   <Scatter
                     key={w.id}
@@ -294,14 +302,15 @@ function CaseCard({ c, workers }: { c: BatteryCase; workers: WorkerInfo[] }) {
       <div className="case-stake">{Math.round(c.stake).toLocaleString()} EUR recoverable</div>
       <div className="case-agents">
         {workers.map((w) => {
-          const s = c.agents[w.id].mean
+          const a = c.agents[w.id]
+          if (!a) return null
           return (
             <div className="case-chip" key={w.id} title={w.label}>
               <span className="case-chip-name" style={{ color: color(w.id) }}>
-                {w.label.replace(/^DeepSeek /, '').slice(0, 7)}
+                {SHORT[w.id] ?? w.label}
               </span>
-              <span className="case-chip-score" style={{ color: scoreColor(s) }}>
-                {pct(s)}
+              <span className="case-chip-score" style={{ color: scoreColor(a.mean) }}>
+                {pct(a.mean)}
               </span>
             </div>
           )

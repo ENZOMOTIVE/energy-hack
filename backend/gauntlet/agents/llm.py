@@ -149,6 +149,7 @@ Eclipse pre-trading: a solar_eclipse event lists tranches, each with start_hour 
 
 MAX_CALLS = 12
 MIN_STEPS_BETWEEN_CALLS = 4
+MAX_FAULT_RETRIES = 1  # re-ask a declined/gated fault at most this many times, then let it rest
 
 _PROVIDER_DEFAULTS = {
     "anthropic": "claude-sonnet-4-6",
@@ -183,6 +184,7 @@ class LLMWorker(Agent):
         self.calls = 0
         self.last_call_step = -100
         self.step0_done = False
+        self.fault_retries = {}
         self._queue: list[Action] = []
 
     def _get_client(self):
@@ -228,16 +230,26 @@ class LLMWorker(Agent):
         trig = self.state.update_and_check(obs)
         if trig is None or self.calls >= MAX_CALLS or k - self.last_call_step < MIN_STEPS_BETWEEN_CALLS:
             if trig is not None and trig[0] == "fault":
-                self._rearm_fault(trig[1])  # trigger consumed but call gated: re-ask later
+                self._maybe_retry_fault(trig[1])  # call gated: re-ask later, but bounded
             return Action.noop()
         self.calls += 1
         self.last_call_step = k
         action = self._call_with_retry(self._payload(obs), obs)
         if trig[0] == "fault" and action.type != "dispatch_crew":
-            self._rearm_fault(trig[1])  # model declined: keep the trigger alive
+            self._maybe_retry_fault(trig[1])  # model declined the crew (e.g. cautious hedging)
         return action
 
-    def _rearm_fault(self, park: str):
+    def _maybe_retry_fault(self, park: str):
+        """Re-arm a fault for at most MAX_FAULT_RETRIES re-asks, then let it rest.
+
+        Without the bound, a persona whose doctrine declines small faults (e.g.
+        ds-cautious below its dispatch threshold) re-triggers the same fault every
+        step and burns the whole call budget, starving other parks. Once the bound
+        is hit we leave the park in crew_sent (so the fault cannot re-fire) and keep
+        it in pending_residual, so the residual leg hedges the gap once."""
+        if self.calls >= MAX_CALLS or self.fault_retries.get(park, 0) >= MAX_FAULT_RETRIES:
+            return
+        self.fault_retries[park] = self.fault_retries.get(park, 0) + 1
         self.state.crew_sent.discard(park)
         self.state.pending_residual.discard(park)
 

@@ -50,6 +50,8 @@ def _agent(name: str):
 
 def _report_row(per_case_means: list, cases_out: list) -> dict:
     """Aggregate one worker's per-case mean scores into the report KPIs."""
+    if not per_case_means:
+        return {"pass_rate": 0.0, "p10": 0.0, "mean": 0.0, "hardest": None}
     arr = np.array(per_case_means)
     hardest_i = int(np.argmin(per_case_means))
     return {

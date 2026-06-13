@@ -1,6 +1,9 @@
 import type { Results, Trace } from './types'
 
-const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:8000'
+// Same-origin (relative) in the production build served by FastAPI; explicit
+// localhost:8000 in dev so the Vite server on :5173 reaches the API on :8000.
+const env = (import.meta as any).env
+const API = env?.VITE_API_URL ?? (env?.PROD ? '' : 'http://localhost:8000')
 
 export type DataSource = 'synthetic' | 'real'
 

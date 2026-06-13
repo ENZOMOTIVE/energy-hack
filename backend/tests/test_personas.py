@@ -4,8 +4,11 @@ All deterministic and offline: persona wiring assembles prompts and names
 without touching the API (the client is lazy); category() is pure."""
 
 from gauntlet.agents import personas
-from gauntlet.agents.llm import LLMWorker, make_persona_agent
+from gauntlet.agents.base import Action
+from gauntlet.agents.llm import MAX_CALLS, LLMWorker, make_persona_agent
 from gauntlet.genome import Bust, CaseGenome, Fault
+from gauntlet.scenarios import build_from_genome
+from gauntlet.sim import run_episode
 
 
 def test_three_personas_registered():
@@ -34,6 +37,25 @@ def test_persona_worker_identity():
     base = LLMWorker(provider="deepseek")
     assert base.name == "deepseek"
     assert base.system_prompt != a.system_prompt
+
+
+def test_declined_fault_does_not_burn_the_call_budget():
+    """A worker that keeps declining the crew on a persistent fault (the cautious
+    'hedge a small fault and wait' path) must NOT re-trigger it every step and
+    exhaust MAX_CALLS, which would starve every other park of model calls."""
+
+    class DecliningWorker(LLMWorker):
+        def __init__(self):
+            super().__init__(provider="deepseek", persona="ds-cautious")
+
+        def _call_with_retry(self, payload, obs):  # never hits the API
+            park = next(iter(obs.forecast))
+            return Action(type="trade", park=park, delta_mw=-1.0, hours=1.0, reason="stub decline")
+
+    g = CaseGenome(fault=Fault("zaragoza", 36, 0.20))  # 20% fault, persists all day
+    w = DecliningWorker()
+    run_episode(build_from_genome(g, seed=0), w)
+    assert w.calls <= 3 < MAX_CALLS  # bounded re-asks, not one per step
 
 
 def test_category_classifies_failure_modes():

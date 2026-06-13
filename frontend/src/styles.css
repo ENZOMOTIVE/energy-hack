@@ -20,6 +20,9 @@ table.board th, table.board td {
 table.board th { background: #161b22; font-size: 14px; }
 td.cell { cursor: pointer; }
 td.cell:hover { background: #161b22; }
+/* group the DeepSeek persona rows visually on the leaderboard */
+tr.persona-row th:first-child { border-left: 3px solid #a371f7; }
+tr.persona-row th { color: #c9b6f0; }
 .score { font-size: 22px; font-weight: 700; }
 .score.good { color: #3fb950; }
 .score.mid { color: #d29922; }
@@ -136,7 +139,7 @@ button.chaos:disabled { opacity: 0.4; cursor: not-allowed; }
 .case-name { font-size: 11px; color: #6e7681; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
 .case-label { font-weight: 600; font-size: 13px; margin: 3px 0 6px; line-height: 1.35; }
 .case-stake { color: #d29922; font-size: 12px; font-weight: 700; }
-.case-agents { display: flex; gap: 14px; margin-top: 8px; }
+.case-agents { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 8px; }
 .case-chip { display: flex; flex-direction: column; }
 .case-chip-name { color: #6e7681; font-size: 11px; }
 .case-chip-score { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }

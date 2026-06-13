@@ -7,6 +7,16 @@ intelligent test-case generator (genome + fitness + evolutionary search +
 diversity selection + battery report; discrimination and adversarial modes;
 opt-in LLM red-team author). Backend done and gated; UI tab is the open piece.
 
+## Multi-worker + reports: remaining (deferred from the personas pass)
+
+- Real-data leaderboard persona rows (today the personas are synthetic-only; the
+  real board still shows the generic `deepseek` row).
+- A 4th `ds-cost-focused` persona (prioritise avoiding crew fees and imbalance
+  over coverage).
+- Per-persona Monte-Carlo above 1 (today personas are a single run per case,
+  labelled as such; bumping to 3 tightens the bands at 3x the API cost).
+- Open a generated battery case in the replay view (shared with the item below).
+
 ## Generator: remaining
 
 - UI: a GENERATOR/BATTERY tab. Show the curated battery (cards by failure-mode

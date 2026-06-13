@@ -110,7 +110,7 @@ export default function Leaderboard({
         </thead>
         <tbody>
           {presentAgents.map((ag) => (
-            <tr key={ag}>
+            <tr key={ag} className={ag.startsWith('ds-') ? 'persona-row' : ''}>
               <th>{AGENT_LABELS[ag] ?? ag}</th>
               {SCENARIO_ORDER.map((sc) => cell(sc, ag))}
             </tr>

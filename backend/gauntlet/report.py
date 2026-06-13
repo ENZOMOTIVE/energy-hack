@@ -14,6 +14,8 @@ import matplotlib
 matplotlib.use("Agg")  # headless: no display needed
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+
+from .fitness import TAU  # noqa: E402
 from reportlab.lib import colors  # noqa: E402
 from reportlab.lib.pagesizes import A4  # noqa: E402
 from reportlab.lib.styles import getSampleStyleSheet  # noqa: E402
@@ -21,6 +23,8 @@ from reportlab.lib.units import cm  # noqa: E402
 from reportlab.platypus import (Image, Paragraph, SimpleDocTemplate, Spacer,  # noqa: E402
                                 Table, TableStyle)
 
+# CALM is intentionally omitted: the high-fitness search never keeps a calm day,
+# so no generated battery contains one. Only categories present in the cases plot.
 CATEGORY_ORDER = ["FAULT", "WEATHER", "ECLIPSE", "COMBO"]
 WORKER_COLOR = {
     "noop": "#8b949e", "rules": "#f85149", "llm": "#3fb950",
@@ -55,7 +59,7 @@ def battery_csv(payload: dict) -> str:
                round(c["stake"]), round(c["floor"]), round(c["oracle"]), c["fitness"]]
         for wid, _, _, _ in workers:
             a = c["agents"][wid]
-            row += [round(a["mean"], 4), int(a["mean"] >= 0.5)]
+            row += [round(a["mean"], 4), int(a["mean"] >= TAU)]
         w.writerow(row)
     return buf.getvalue()
 
@@ -109,7 +113,8 @@ def scatter_png(payload: dict) -> bytes:
     ax.set_title("Risk vs return")
     ax.grid(alpha=0.3)
     ax.set_xlim(-3, 103)
-    ax.set_ylim(-3, max(40, *(r["p10"] * 100 for *_, r in workers)) + 8)
+    p10s = [r["p10"] * 100 for *_, r in workers]
+    ax.set_ylim(-3, max([40, *p10s]) + 8)   # list literal stays non-empty even with no workers
     fig.tight_layout()
     return _fig_bytes(fig)
 
@@ -181,7 +186,7 @@ def battery_pdf(payload: dict, mode: str) -> bytes:
     # case appendix
     elems.append(Spacer(1, 0.2 * cm))
     elems.append(Paragraph("<b>Generated cases (hardest first)</b>", styles["Heading2"]))
-    legend = " &nbsp; ".join(f"{SHORT[wid]}={label}" for wid, label, _, _ in workers if wid in SHORT)
+    legend = " &nbsp; ".join(f"{SHORT.get(wid, wid[:4])}={label}" for wid, label, _, _ in workers)
     elems.append(Paragraph(f"<font size=7>{legend}; values are mean recovered %.</font>", styles["BodyText"]))
     ahead = ["Case", "Cat", "Stake EUR"] + [SHORT.get(wid, wid[:4]) for wid, *_ in workers]
     arows = [ahead]

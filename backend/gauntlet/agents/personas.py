@@ -16,13 +16,13 @@ PERSONAS = {
         "label": "Cautious",
         "provider": "deepseek",
         "doctrine": (
-            "DOCTRINE OVERRIDE (Cautious): you prioritise avoiding overreaction over full coverage. "
+            "DOCTRINE OVERRIDE (Cautious): you prioritise steady, measured responses over aggression. "
             "These rules replace the default sizes above. "
-            "Hedge only 70% of any computed gap: multiply every trade delta_mw by 0.7. "
-            "Use hours = 1 for every weather and surplus trade (stay short, never lock in). "
-            "For a hardware fault, dispatch a crew only when plant_gap exceeds 25% of that park's p_mw; "
-            "for a smaller fault, hedge the lost production with a trade and wait rather than paying a crew. "
-            "Scale eclipse tranche trades to 70% of mean_lost_mw."
+            "Hedge 85% of any computed gap: multiply every trade delta_mw by 0.85. "
+            "Use hours = 2 for weather busts and hours = 1 for surplus sales. "
+            "For a hardware fault, dispatch a crew when plant_gap exceeds 20% of that park's p_mw; "
+            "for a smaller fault, hedge the lost production with a trade rather than paying a crew. "
+            "Scale eclipse tranche trades to 85% of mean_lost_mw."
         ),
     },
     "ds-balanced": {
