@@ -1,11 +1,9 @@
 # Gauntlet
 
-
-## Project Tags
-
-- `Agentic AI`
-- `Full Stack`
-- `Protocol`
+The proving ground for solar asset-management agents. A deterministic simulator
+throws bad days (cloud-front forecast busts, silent hardware faults, the
+Aug 12 2026 eclipse) at any agent and scores, in euros, what its reactions cost.
+See SPEC.md for the concept and DEVPLAN.md for the architecture.
 
 ## Run it
 
@@ -67,3 +65,12 @@ API (default model claude-sonnet-4-6, override with `GAUNTLET_MODEL`).
 `GAUNTLET_PROVIDER=anthropic|deepseek` instead swaps the brain inside the
 default `llm` agent slot for `make traces` (legacy `GAUNTLET_USE_ANTHROPIC=1`
 still works). Tests always run the mock.
+
+## Project Metadata
+
+| Field | Details |
+| --- | --- |
+| Repository | `ENZOMOTIVE/energy-hack` |
+| Categories | `Agentic AI`, `Full Stack`, `Protocol` |
+| Primary stack | React, Vite, Make, Node.js, TypeScript, Python, HTML, CSS |
+
