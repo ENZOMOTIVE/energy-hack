@@ -65,12 +65,3 @@ API (default model claude-sonnet-4-6, override with `GAUNTLET_MODEL`).
 `GAUNTLET_PROVIDER=anthropic|deepseek` instead swaps the brain inside the
 default `llm` agent slot for `make traces` (legacy `GAUNTLET_USE_ANTHROPIC=1`
 still works). Tests always run the mock.
-
-## Project Metadata
-
-| Field | Details |
-| --- | --- |
-| Repository | `ENZOMOTIVE/energy-hack` |
-| Categories | `Agentic AI`, `Full Stack`, `Protocol` |
-| Primary stack | React, Vite, Make, Node.js, TypeScript, Python, HTML, CSS |
-
