@@ -1,9 +1,11 @@
 # Gauntlet
 
-The proving ground for solar asset-management agents. A deterministic simulator
-throws bad days (cloud-front forecast busts, silent hardware faults, the
-Aug 12 2026 eclipse) at any agent and scores, in euros, what its reactions cost.
-See SPEC.md for the concept and DEVPLAN.md for the architecture.
+
+## Project Tags
+
+- `Agentic AI`
+- `Full Stack`
+- `Protocol`
 
 ## Run it
 
